@@ -1,0 +1,27 @@
+Sample ofono binder plugin extension
+====================================
+
+It doesn't really do anything. It's just a demonstration of how
+the extension interfaces (BINDER_EXT_TYPE_IMS being used as an
+example) are supposed to be implemented.
+
+Here is what happens when this extension gets loaded.
+
+1. ofono calls sample_plugin_init(). That function creates an
+   instance of SampleExt and registers it under the name "sample"
+   by calling binder_ext_plugin_register()
+
+2. ofono-binder-plugin finds the extension by name which it reads
+   from /etc/ofono/binder.d/sample.conf
+
+3. ofono-binder-plugin calls sample_ext_new_slot() method of SampleExt
+   for each configured/detected slot. That creates per-slot SampleSlot
+   objects.
+
+4. ofono-binder-plugin asks SampleSlot for particular interfaces by
+   calling its sample_slot_get_interface() method. SampleSlot only
+   reacts to BINDER_EXT_TYPE_IMS query and returns a pointer to
+   SampleIms object implementing BinderExtImsInterface
+
+5. ofono-binder-plugin then goes on to call BinderExtImsInterface
+   methods of SampleIms object(s).
