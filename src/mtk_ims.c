@@ -37,15 +37,20 @@
 
 #include "mtk_ims.h"
 #include "mtk_slot.h"
+#include "mtk_radio_ext.h"
 
 #include <binder_ext_ims_impl.h>
 
 #include <ofono/log.h>
+#include <gbinder.h>
+
+#include <gutil_macros.h>
 
 typedef GObjectClass MtkImsClass;
 typedef struct mtk_ims {
     GObject parent;
     char* slot;
+    MtkRadioExt* radio_ext;
 } MtkIms;
 
 static
@@ -69,6 +74,65 @@ enum mtk_ims_signal {
 #define SIGNAL_STATE_CHANGED_NAME    "mtk-ims-state-changed"
 
 static guint mtk_ims_signals[SIGNAL_COUNT] = { 0 };
+
+typedef struct mtk_ims_result_request {
+    BinderExtIms* ext;
+    BinderExtImsResultFunc complete;
+    GDestroyNotify destroy;
+    void* user_data;
+} MtkImsResultRequest;
+
+static
+MtkImsResultRequest*
+mtk_ims_result_request_new(
+    BinderExtIms* ext,
+    BinderExtImsResultFunc complete,
+    GDestroyNotify destroy,
+    void* user_data)
+{
+    MtkImsResultRequest* req = g_slice_new(MtkImsResultRequest);
+
+    req->ext = binder_ext_ims_ref(ext);
+    req->complete = complete;
+    req->destroy = destroy;
+    req->user_data = user_data;
+    return req;
+}
+
+static
+void
+mtk_ims_result_request_free(
+    MtkImsResultRequest* req)
+{
+    binder_ext_ims_unref(req->ext);
+    gutil_slice_free(req);
+}
+
+static
+void
+mtk_ims_result_request_complete(
+    MtkRadioExt* radio_ext,
+    int result,
+    void* user_data)
+{
+    MtkImsResultRequest* req = user_data;
+
+    req->complete(req->ext, result ? BINDER_EXT_IMS_RESULT_ERROR :
+        BINDER_EXT_IMS_RESULT_OK, req->user_data);
+}
+
+static
+void
+mtk_ims_result_request_destroy(
+    gpointer user_data)
+{
+    MtkImsResultRequest* req = user_data;
+
+    if (req->destroy) {
+        req->destroy(req->user_data);
+    }
+    mtk_ims_result_request_free(req);
+}
 
 /*==========================================================================*
  * BinderExtImsInterface
@@ -96,15 +160,20 @@ mtk_ims_set_registration(
     void* user_data)
 {
     MtkIms* self = THIS(ext);
-    const gboolean on = (registration != BINDER_EXT_IMS_REGISTRATION_OFF);
+    const gboolean enabled = (registration != BINDER_EXT_IMS_REGISTRATION_OFF);
+    MtkImsResultRequest* req = mtk_ims_result_request_new(ext,
+        complete, destroy, user_data);
+    guint id = mtk_radio_ext_set_enabled(self->radio_ext,
+        enabled,
+        complete ? mtk_ims_result_request_complete : NULL,
+        mtk_ims_result_request_destroy, req);
 
-    DBG("%s %s", self->slot, on ? "on" : "off");
-    if (on) {
-#pragma message("TODO: turn IMS registration on")
+    if (id) {
+        return id;
     } else {
-#pragma message("TODO: turn IMS registration off")
+        mtk_ims_result_request_free(req);
+        return 0;
     }
-    return 0;
 }
 
 static
@@ -154,6 +223,7 @@ mtk_ims_iface_init(
 
 BinderExtIms*
 mtk_ims_new(
+    const char* dev,
     const char* slot)
 {
     MtkIms* self = g_object_new(THIS_TYPE, NULL);
@@ -163,6 +233,8 @@ mtk_ims_new(
      * on registration state change and emits SIGNAL_STATE_CHANGED.
      */
     self->slot = g_strdup(slot);
+    self->radio_ext = mtk_radio_ext_new(dev, slot);
+
     return BINDER_EXT_IMS(self);
 }
 
@@ -178,6 +250,8 @@ mtk_ims_finalize(
     MtkIms* self = THIS(object);
 
     g_free(self->slot);
+    mtk_radio_ext_unref(self->radio_ext);
+
     G_OBJECT_CLASS(PARENT_CLASS)->finalize(object);
 }
 

@@ -35,6 +35,7 @@ STATIC_LIB = $(NAME).a
 SRC = \
   mtk_ext.c \
   mtk_ims.c \
+  mtk_radio_ext.c \
   mtk_plugin.c \
   mtk_slot.c
 

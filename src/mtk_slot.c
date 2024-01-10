@@ -106,7 +106,7 @@ mtk_slot_new(
     MtkSlot* self = g_object_new(THIS_TYPE, NULL);
     BinderExtSlot* slot = &self->parent;
 
-    self->ims = mtk_ims_new(radio->slot);
+    self->ims = mtk_ims_new(radio->dev, radio->slot);
     return slot;
 }
 

@@ -42,6 +42,7 @@
 
 BinderExtIms*
 mtk_ims_new(
+    const char* dev,
     const char* slot)
     G_GNUC_INTERNAL;
 
