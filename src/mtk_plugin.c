@@ -35,19 +35,36 @@
  * any official policies, either expressed or implied.
  */
 
-#ifndef SAMPLE_EXT_H
-#define SAMPLE_EXT_H
+#include "mtk_ext.h"
 
-#include <binder_ext_types.h>
+#include <binder_ext_plugin.h>
 
-extern const char sample_plugin_name[] G_GNUC_INTERNAL;
+#include <ofono/log.h>
+#include <ofono/plugin.h>
 
-BinderExtPlugin*
-sample_ext_new(
-    void)
-    G_GNUC_INTERNAL;
+static
+int
+mtk_plugin_init()
+{
+    BinderExtPlugin* ext;
 
-#endif /* SAMPLE_EXT_H */
+    DBG("");
+    ext = mtk_ext_new();
+    binder_ext_plugin_register(ext);
+    binder_ext_plugin_unref(ext); /* libofonobinderpluginext keeps the ref */
+    return 0;
+}
+
+static
+void
+mtk_plugin_exit()
+{
+    DBG("");
+    binder_ext_plugin_unregister(mtk_plugin_name);
+}
+
+OFONO_PLUGIN_DEFINE(mtk, "ofono-binder-plugin extension for MTK devices", OFONO_VERSION,
+    OFONO_PLUGIN_PRIORITY_DEFAULT, mtk_plugin_init, mtk_plugin_exit)
 
 /*
  * Local Variables:

@@ -22,7 +22,7 @@ all: debug release
 # Library name
 #
 
-NAME = samplebinderpluginext
+NAME = mtkbinderpluginext
 LIB_NAME = $(NAME)
 LIB_SONAME = $(LIB_NAME).so
 LIB = $(LIB_SONAME)
@@ -33,10 +33,10 @@ STATIC_LIB = $(NAME).a
 #
 
 SRC = \
-  sample_ext.c \
-  sample_ims.c \
-  sample_plugin.c \
-  sample_slot.c
+  mtk_ext.c \
+  mtk_ims.c \
+  mtk_plugin.c \
+  mtk_slot.c
 
 #
 # Directories

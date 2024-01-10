@@ -35,20 +35,19 @@
  * any official policies, either expressed or implied.
  */
 
-#ifndef SAMPLE_SLOT_H
-#define SAMPLE_SLOT_H
+#ifndef MTK_EXT_H
+#define MTK_EXT_H
 
-#include <binder_ext_slot.h>
+#include <binder_ext_types.h>
 
-#include <radio_types.h>
+extern const char mtk_plugin_name[] G_GNUC_INTERNAL;
 
-BinderExtSlot*
-sample_slot_new(
-    RadioInstance* radio,
-    GHashTable* params)
+BinderExtPlugin*
+mtk_ext_new(
+    void)
     G_GNUC_INTERNAL;
 
-#endif /* SAMPLE_SLOT_H */
+#endif /* MTK_EXT_H */
 
 /*
  * Local Variables:

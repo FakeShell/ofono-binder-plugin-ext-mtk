@@ -1,8 +1,8 @@
-Name: ofono-binder-plugin-ext-sample
+Name: ofono-binder-plugin-ext-mtk
 
 Version: 1.0.0
 Release: 1
-Summary: Sample extension for ofono binder plugin
+Summary: MediaTek IRadio extension ofono binder plugin
 License: BSD
 URL: https://github.com/monich/ofono-binder-plugin-ext-sample
 Source: %{name}-%{version}.tar.bz2
@@ -18,7 +18,7 @@ BuildRequires: pkgconfig(libofonobinderpluginext)
 %define config_dir /etc/ofono/binder.d/
 
 %description
-Sample extension for ofono binder plugin
+MediaTek IRadio extension for ofono binder plugin
 
 %prep
 %setup -q -n %{name}-%{version}
@@ -30,11 +30,11 @@ make %{_smp_mflags} PLUGINDIR=%{plugin_dir} KEEP_SYMBOLS=1 release
 rm -rf %{buildroot}
 make DESTDIR=%{buildroot} PLUGINDIR=%{plugin_dir} install
 mkdir -p %{buildroot}%{config_dir}
-install -m 644 sample.conf %{buildroot}%{config_dir}
+install -m 644 mtk.conf %{buildroot}%{config_dir}
 
 %files
 %dir %{plugin_dir}
 %dir %{config_dir}
 %defattr(-,root,root,-)
-%config %{config_dir}/sample.conf
-%{plugin_dir}/samplebinderpluginext.so
+%config %{config_dir}/mtk.conf
+%{plugin_dir}/mtkbinderpluginext.so

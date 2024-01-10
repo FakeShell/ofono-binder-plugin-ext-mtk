@@ -35,40 +35,40 @@
  * any official policies, either expressed or implied.
  */
 
-#include "sample_ims.h"
-#include "sample_slot.h"
+#include "mtk_ims.h"
+#include "mtk_slot.h"
 
 #include <binder_ext_ims_impl.h>
 
 #include <ofono/log.h>
 
-typedef GObjectClass SampleImsClass;
-typedef struct sample_ims {
+typedef GObjectClass MtkImsClass;
+typedef struct mtk_ims {
     GObject parent;
     char* slot;
-} SampleIms;
+} MtkIms;
 
 static
 void
-sample_ims_iface_init(
+mtk_ims_iface_init(
     BinderExtImsInterface* iface);
 
-GType sample_ims_get_type() G_GNUC_INTERNAL;
-G_DEFINE_TYPE_WITH_CODE(SampleIms, sample_ims, G_TYPE_OBJECT,
-G_IMPLEMENT_INTERFACE(BINDER_EXT_TYPE_IMS, sample_ims_iface_init))
+GType mtk_ims_get_type() G_GNUC_INTERNAL;
+G_DEFINE_TYPE_WITH_CODE(MtkIms, mtk_ims, G_TYPE_OBJECT,
+G_IMPLEMENT_INTERFACE(BINDER_EXT_TYPE_IMS, mtk_ims_iface_init))
 
-#define THIS_TYPE sample_ims_get_type()
-#define THIS(obj) G_TYPE_CHECK_INSTANCE_CAST(obj, THIS_TYPE, SampleIms)
-#define PARENT_CLASS sample_ims_parent_class
+#define THIS_TYPE mtk_ims_get_type()
+#define THIS(obj) G_TYPE_CHECK_INSTANCE_CAST(obj, THIS_TYPE, MtkIms)
+#define PARENT_CLASS mtk_ims_parent_class
 
-enum sample_ims_signal {
+enum mtk_ims_signal {
     SIGNAL_STATE_CHANGED,
     SIGNAL_COUNT
 };
 
-#define SIGNAL_STATE_CHANGED_NAME    "sample-ims-state-changed"
+#define SIGNAL_STATE_CHANGED_NAME    "mtk-ims-state-changed"
 
-static guint sample_ims_signals[SIGNAL_COUNT] = { 0 };
+static guint mtk_ims_signals[SIGNAL_COUNT] = { 0 };
 
 /*==========================================================================*
  * BinderExtImsInterface
@@ -76,10 +76,10 @@ static guint sample_ims_signals[SIGNAL_COUNT] = { 0 };
 
 static
 BINDER_EXT_IMS_STATE
-sample_ims_get_state(
+mtk_ims_get_state(
     BinderExtIms* ext)
 {
-    SampleIms* self = THIS(ext);
+    MtkIms* self = THIS(ext);
 
     DBG("%s", self->slot);
 #pragma message("TODO: return the actual state")
@@ -88,14 +88,14 @@ sample_ims_get_state(
 
 static
 guint
-sample_ims_set_registration(
+mtk_ims_set_registration(
     BinderExtIms* ext,
     BINDER_EXT_IMS_REGISTRATION registration,
     BinderExtImsResultFunc complete,
     GDestroyNotify destroy,
     void* user_data)
 {
-    SampleIms* self = THIS(ext);
+    MtkIms* self = THIS(ext);
     const gboolean on = (registration != BINDER_EXT_IMS_REGISTRATION_OFF);
 
     DBG("%s %s", self->slot, on ? "on" : "off");
@@ -109,27 +109,27 @@ sample_ims_set_registration(
 
 static
 void
-sample_ims_cancel(
+mtk_ims_cancel(
     BinderExtIms* ext,
     guint id)
 {
-    SampleIms* self = THIS(ext);
+    MtkIms* self = THIS(ext);
 
     /*
      * Cancel a pending operation identified by the id returned by the
-     * above sample_ims_set_registration() call.
+     * above mtk_ims_set_registration() call.
      */
     DBG("%s %u", self->slot, id);
 }
 
 static
 gulong
-sample_ims_add_state_handler(
+mtk_ims_add_state_handler(
     BinderExtIms* ext,
     BinderExtImsFunc handler,
     void* user_data)
 {
-    SampleIms* self = THIS(ext);
+    MtkIms* self = THIS(ext);
 
     DBG("%s", self->slot);
     return G_LIKELY(handler) ? g_signal_connect(self,
@@ -138,14 +138,14 @@ sample_ims_add_state_handler(
 
 static
 void
-sample_ims_iface_init(
+mtk_ims_iface_init(
     BinderExtImsInterface* iface)
 {
     iface->version = BINDER_EXT_IMS_INTERFACE_VERSION;
-    iface->get_state = sample_ims_get_state;
-    iface->set_registration = sample_ims_set_registration;
-    iface->cancel = sample_ims_cancel;
-    iface->add_state_handler = sample_ims_add_state_handler;
+    iface->get_state = mtk_ims_get_state;
+    iface->set_registration = mtk_ims_set_registration;
+    iface->cancel = mtk_ims_cancel;
+    iface->add_state_handler = mtk_ims_add_state_handler;
 }
 
 /*==========================================================================*
@@ -153,10 +153,10 @@ sample_ims_iface_init(
  *==========================================================================*/
 
 BinderExtIms*
-sample_ims_new(
+mtk_ims_new(
     const char* slot)
 {
-    SampleIms* self = g_object_new(THIS_TYPE, NULL);
+    MtkIms* self = g_object_new(THIS_TYPE, NULL);
 
     /*
      * This could be the place to register a listener that gets invoked
@@ -172,10 +172,10 @@ sample_ims_new(
 
 static
 void
-sample_ims_finalize(
+mtk_ims_finalize(
     GObject* object)
 {
-    SampleIms* self = THIS(object);
+    MtkIms* self = THIS(object);
 
     g_free(self->slot);
     G_OBJECT_CLASS(PARENT_CLASS)->finalize(object);
@@ -183,18 +183,18 @@ sample_ims_finalize(
 
 static
 void
-sample_ims_init(
-    SampleIms* self)
+mtk_ims_init(
+    MtkIms* self)
 {
 }
 
 static
 void
-sample_ims_class_init(
-    SampleImsClass* klass)
+mtk_ims_class_init(
+    MtkImsClass* klass)
 {
-    G_OBJECT_CLASS(klass)->finalize = sample_ims_finalize;
-    sample_ims_signals[SIGNAL_STATE_CHANGED] =
+    G_OBJECT_CLASS(klass)->finalize = mtk_ims_finalize;
+    mtk_ims_signals[SIGNAL_STATE_CHANGED] =
         g_signal_new(SIGNAL_STATE_CHANGED_NAME, G_OBJECT_CLASS_TYPE(klass),
             G_SIGNAL_RUN_FIRST, 0, NULL, NULL, NULL, G_TYPE_NONE, 0);
 }

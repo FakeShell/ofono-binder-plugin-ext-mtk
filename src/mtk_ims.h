@@ -35,36 +35,17 @@
  * any official policies, either expressed or implied.
  */
 
-#include "sample_ext.h"
+#ifndef MTK_IMS_H
+#define MTK_IMS_H
 
-#include <binder_ext_plugin.h>
+#include <binder_ext_ims.h>
 
-#include <ofono/log.h>
-#include <ofono/plugin.h>
+BinderExtIms*
+mtk_ims_new(
+    const char* slot)
+    G_GNUC_INTERNAL;
 
-static
-int
-sample_plugin_init()
-{
-    BinderExtPlugin* ext;
-
-    DBG("");
-    ext = sample_ext_new();
-    binder_ext_plugin_register(ext);
-    binder_ext_plugin_unref(ext); /* libofonobinderpluginext keeps the ref */
-    return 0;
-}
-
-static
-void
-sample_plugin_exit()
-{
-    DBG("");
-    binder_ext_plugin_unregister(sample_plugin_name);
-}
-
-OFONO_PLUGIN_DEFINE(sample, "Sample binder plugin extension", OFONO_VERSION,
-    OFONO_PLUGIN_PRIORITY_DEFAULT, sample_plugin_init, sample_plugin_exit)
+#endif /* MTK_IMS_H */
 
 /*
  * Local Variables:
