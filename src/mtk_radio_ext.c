@@ -14,24 +14,17 @@
  *  GNU General Public License for more details.
  */
 
+#include <glib-object.h>
+
 #include "mtk_radio_ext.h"
+#include "mtk_radio_ext_types.h"
 
 #include <ofono/log.h>
 #include <gbinder.h>
 
-#include <glib-object.h>
 #include <gutil_idlepool.h>
+#include <gutil_log.h>
 #include <gutil_macros.h>
-
-#define MTK_RADIO_IFACE_PREFIX      "vendor.mediatek.hardware.radio@"
-#define MTK_RADIO_IFACE(x)          MTK_RADIO_IFACE_PREFIX "3.0::" x
-#define MTK_RADIO                   MTK_RADIO_IFACE("IMtkRadioEx")
-#define MTK_RADIO_RESPONSE          MTK_RADIO_IFACE("IImsRadioResponse")
-#define MTK_RADIO_INDICATION        MTK_RADIO_IFACE("IImsRadioIndication")
-
-#define MTK_RADIO_REQ_SET_RESPONSE_FUNCTIONS_IMS   3
-#define MTK_RADIO_REQ_SET_IMS_ENABLED              152
-#define MTK_RADIO_RESP_SET_IMS_ENABLED             153
 
 #define MTK_RADIO_CALL_TIMEOUT (3*1000) /* ms */
 
@@ -86,12 +79,155 @@ typedef struct mtk_radio_ext_result_request {
     MtkRadioExtResultFunc complete;
 } MtkRadioExtResultRequest;
 
+static GLogModule mtk_radio_ext_binder_log_module = {
+    .max_level = GLOG_LEVEL_VERBOSE,
+    .level = GLOG_LEVEL_VERBOSE,
+    .flags = GLOG_FLAG_HIDE_NAME
+};
+
+static GLogModule mtk_radio_ext_binder_dump_module = {
+    .parent = &mtk_radio_ext_binder_log_module,
+    .max_level = GLOG_LEVEL_VERBOSE,
+    .level = GLOG_LEVEL_INHERIT,
+    .flags = GLOG_FLAG_HIDE_NAME
+};
+
+static
+void
+mtk_radio_ext_log_notify(
+    struct ofono_debug_desc* desc)
+{
+    mtk_radio_ext_binder_log_module.level = (desc->flags &
+        OFONO_DEBUG_FLAG_PRINT) ? GLOG_LEVEL_VERBOSE : GLOG_LEVEL_INHERIT;
+}
+
+static
+void
+mtk_radio_ext_dump_notify(
+    struct ofono_debug_desc* desc)
+{
+    mtk_radio_ext_binder_dump_module.level = (desc->flags &
+        OFONO_DEBUG_FLAG_PRINT) ? GLOG_LEVEL_VERBOSE : GLOG_LEVEL_INHERIT;
+}
+
+static struct ofono_debug_desc logger_trace OFONO_DEBUG_ATTR = {
+    .name = "mtk_binder_trace",
+    .flags = OFONO_DEBUG_FLAG_DEFAULT | OFONO_DEBUG_FLAG_HIDE_NAME,
+    .notify = mtk_radio_ext_log_notify
+};
+
+static struct ofono_debug_desc logger_dump OFONO_DEBUG_ATTR = {
+    .name = "mtk_binder_dump",
+    .flags = OFONO_DEBUG_FLAG_DEFAULT | OFONO_DEBUG_FLAG_HIDE_NAME,
+    .notify = mtk_radio_ext_dump_notify
+};
+
 static
 guint
 mtk_radio_ext_new_req_id()
 {
     static guint last_id = 0;
     return last_id++;
+}
+
+static
+void
+mtk_radio_ext_log_req(
+    MtkRadioExt* self,
+    guint32 code,
+    guint32 serial)
+{
+    static const GLogModule* log = &mtk_radio_ext_binder_log_module;
+    const int level = GLOG_LEVEL_VERBOSE;
+    const char* name;
+
+    if (!gutil_log_enabled(log, level))
+        return;
+
+    name = mtk_radio_ext_req_name(code);
+
+    if (serial) {
+        gutil_log(log, level, "%s< [%08x] %u %s",
+            self->slot, serial, code, name ? name : "???");
+    } else {
+        gutil_log(log, level, "%s< %u %s",
+            self->slot, code, name ? name : "???");
+    }
+}
+
+void
+mtk_radio_ext_log_resp(
+    MtkRadioExt* self,
+    guint32 code,
+    guint32 serial)
+{
+    static const GLogModule* log = &mtk_radio_ext_binder_log_module;
+    const int level = GLOG_LEVEL_VERBOSE;
+    const char* name;
+
+    if (!gutil_log_enabled(log, level))
+        return;
+
+    name = mtk_radio_ext_resp_name(code);
+
+    gutil_log(log, level, "%s> [%08x] %u %s",
+        self->slot, serial, code, name ? name : "???");
+}
+
+static
+void
+mtk_radio_ext_log_ind(
+    MtkRadioExt* self,
+    guint32 code)
+{
+    static const GLogModule* log = &mtk_radio_ext_binder_log_module;
+    const int level = GLOG_LEVEL_VERBOSE;
+    const char* name;
+
+    if (!gutil_log_enabled(log, level))
+        return;
+
+    name = mtk_radio_ext_ind_name(code);
+
+    gutil_log(log, level, "%s > %u %s", self->slot, code,
+        name ? name : "???");
+}
+
+static
+void
+mtk_radio_ext_dump_data(
+    const GBinderReader* reader)
+{
+    static const GLogModule* log = &mtk_radio_ext_binder_dump_module;
+    const int level = GLOG_LEVEL_VERBOSE;
+    gsize size;
+    const guint8* data;
+
+    if (!gutil_log_enabled(log, level))
+        return;
+
+    data = gbinder_reader_get_data(reader, &size);
+    gutil_log_dump(log, level, "  ",  data, size);
+}
+
+static
+void
+mtk_radio_ext_dump_request(
+    GBinderLocalRequest* args)
+{
+    static const GLogModule* log = &mtk_radio_ext_binder_dump_module;
+    const int level = GLOG_LEVEL_VERBOSE;
+    GBinderWriter writer;
+    const guint8* data;
+    gsize size;
+
+    if (!gutil_log_enabled(log, level))
+        return;
+
+    /* Use writer API to fetch the raw data */
+    gbinder_local_request_init_writer(args, &writer);
+    data = gbinder_writer_get_data(&writer, &size);
+    gutil_log_dump(log, level, "  ", data, size);
 }
 
 static
@@ -109,6 +245,8 @@ mtk_radio_ext_indication(
     GBinderReader args;
 
     gbinder_remote_request_init_reader(req, &args);
+    mtk_radio_ext_log_ind(self, code);
+    mtk_radio_ext_dump_data(&args);
 
 #pragma message("TODO: implement indication handling")
     DBG("Unexpected indication %s %u", iface, code);
@@ -130,11 +268,15 @@ mtk_radio_ext_response(
     MtkRadioExt* self = THIS(user_data);
     const char* iface = gbinder_remote_request_interface(req);
     GBinderReader reader;
-    guint32 serial;
+    guint32 serial = 0;
 
     gbinder_remote_request_init_reader(req, &reader);
 
-    if (gbinder_reader_read_uint32(&reader, &serial)) {
+    gbinder_reader_read_uint32(&reader, &serial);
+    mtk_radio_ext_log_resp(self, code, serial);
+    mtk_radio_ext_dump_data(&reader);
+
+    if (serial) {
         MtkRadioExtRequest* req = g_hash_table_lookup(self->requests,
             KEY(serial));
 
@@ -255,11 +397,15 @@ gulong
 mtk_radio_ext_call(
     MtkRadioExt* self,
     gint32 code,
+    gint32 serial,
     GBinderLocalRequest* req,
     GBinderClientReplyFunc reply,
     GDestroyNotify destroy,
     void* user_data)
 {
+    mtk_radio_ext_log_req(self, code, serial);
+    mtk_radio_ext_dump_request(req);
+
     return gbinder_client_transact(self->client, code,
         GBINDER_TX_FLAG_ONEWAY, req, reply, destroy, user_data);
 }
@@ -269,10 +415,11 @@ gulong
 mtk_radio_ext_submit_request(
     MtkRadioExtRequest* request,
     gint32 code,
+    gint32 serial,
     GBinderLocalRequest* args)
 {
     return (request->tx = mtk_radio_ext_call(request->radio,
-        code, args, mtk_radio_ext_request_sent, NULL, request));
+        code, serial, args, mtk_radio_ext_request_sent, NULL, request));
 }
 
 static
@@ -307,7 +454,7 @@ mtk_radio_ext_result_request_submit(
         }
 
         /* Submit the request */
-        mtk_radio_ext_submit_request(&req->base, req_code, args);
+        mtk_radio_ext_submit_request(&req->base, req_code, req_id, args);
         gbinder_local_request_unref(args);
         if (req->base.tx) {
             /* Success */
@@ -344,6 +491,8 @@ mtk_radio_ext_create(
     gbinder_writer_append_local_object(&writer, self->response);
     gbinder_writer_append_local_object(&writer, self->indication);
 
+    mtk_radio_ext_log_req(self, code, 0 /*serial*/);
+    mtk_radio_ext_dump_request(req);
     gbinder_remote_reply_unref(gbinder_client_transact_sync_reply(self->client,
         code, req, &status));
 
@@ -419,7 +568,7 @@ mtk_radio_ext_set_enabled(
 {
     return mtk_radio_ext_result_request_submit(self,
         MTK_RADIO_REQ_SET_IMS_ENABLED,
-        MTK_RADIO_RESP_SET_IMS_ENABLED,
+        IMS_RADIO_RESP_SET_IMS_ENABLED,
         mtk_radio_ext_set_enabled_args,
         complete, destroy, user_data,
         enabled);
