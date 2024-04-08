@@ -38,6 +38,7 @@
 #include "mtk_ims.h"
 #include "mtk_slot.h"
 #include "mtk_radio_ext.h"
+#include "mtk_radio_ext_types.h"
 
 #include <binder_ext_ims_impl.h>
 
@@ -160,7 +161,14 @@ mtk_ims_set_registration(
     void* user_data)
 {
     MtkIms* self = THIS(ext);
+
+    DBG("%s", self->slot);
     const gboolean enabled = (registration != BINDER_EXT_IMS_REGISTRATION_OFF);
+
+    mtk_radio_ext_set_ims_cfg_feature_value(self->radio_ext,
+        FEATURE_TYPE_VOICE_OVER_LTE, NETWORK_TYPE_LTE, enabled, ISLAST_NULL,
+        NULL, NULL, NULL);
+
     MtkImsResultRequest* req = mtk_ims_result_request_new(ext,
         complete, destroy, user_data);
     guint id = mtk_radio_ext_set_enabled(self->radio_ext,

@@ -16,7 +16,7 @@
 #ifndef MTK_RADIO_EXT_TYPES_H
 #define MTK_RADIO_EXT_TYPES_H
 
-#define MTK_RADIO_IFACE_PREFIX      "vendor.mediatek.hardware.radio@"
+#define MTK_RADIO_IFACE_PREFIX      "vendor.mediatek.hardware.mtkradioex@"
 #define MTK_RADIO_IFACE(x)          MTK_RADIO_IFACE_PREFIX "3.0::" x
 #define MTK_RADIO                   MTK_RADIO_IFACE("IMtkRadioEx")
 #define MTK_RADIO_RESPONSE          MTK_RADIO_IFACE("IImsRadioResponse")
@@ -110,44 +110,47 @@ typedef enum ims_radio_ind {
 #undef IMS_RADIO_IND_
 } IMS_RADIO_IND;
 
-static const char*
-mtk_radio_ext_req_name(
-    guint32 req)
-{
-    switch (req) {
-#define MTK_RADIO_REQ_(req, resp, name, NAME) \
-        case MTK_RADIO_REQ_##NAME: return #name;
-    MTK_RADIO_EXT_IMS_CALL_3_0(MTK_RADIO_REQ_)
-#undef MTK_RADIO_REQ_
-    }
-    return NULL;
-}
+/* ImsConfig.FeatureConstants in AOSP */
+typedef enum ims_feature_type {
+    FEATURE_TYPE_VOICE_OVER_LTE = 0,
+    FEATURE_TYPE_VIDEO_OVER_LTE = 1,
+    FEATURE_TYPE_VOICE_OVER_WIFI = 2,
+    FEATURE_TYPE_VIDEO_OVER_WIFI = 3,
+    FEATURE_TYPE_UT_OVER_LTE = 4,
+    FEATURE_TYPE_UT_OVER_WIFI = 5,
+} IMS_FEATURE_TYPE;
 
-static const char*
-mtk_radio_ext_resp_name(
-    guint32 resp)
-{
-    switch (resp) {
-#define IMS_RADIO_RESP_(req, resp, name, NAME) \
-        case IMS_RADIO_RESP_##NAME: return #name;
-    MTK_RADIO_EXT_IMS_CALL_3_0(IMS_RADIO_RESP_)
-#undef IMS_RADIO_RESP_
-    }
-    return NULL;
-}
+/* TelephonyManager.NETWORK_TYPES */
+/* note: the numeric values are different from RADIO_TECH enum */
+typedef enum network_type {
+    NETWORK_TYPE_UNKNOWN = 0,
+    NETWORK_TYPE_GPRS = 1,
+    NETWORK_TYPE_EDGE = 2,
+    NETWORK_TYPE_UMTS = 3,
+    NETWORK_TYPE_CDMA = 4,
+    NETWORK_TYPE_EVDO_0 = 5,
+    NETWORK_TYPE_EVDO_A = 6,
+    NETWORK_TYPE_1XRTT = 7,
+    NETWORK_TYPE_HSDPA = 8,
+    NETWORK_TYPE_HSUPA = 9,
+    NETWORK_TYPE_HSPA = 10,
+    NETWORK_TYPE_IDEN = 11,
+    NETWORK_TYPE_EVDO_B = 12,
+    NETWORK_TYPE_LTE = 13,
+    NETWORK_TYPE_EHRPD = 14,
+    NETWORK_TYPE_HSPAP = 15,
+    NETWORK_TYPE_GSM = 16,
+    NETWORK_TYPE_TD_SCDMA = 17,
+    NETWORK_TYPE_IWLAN = 18,
+    NETWORK_TYPE_LTE_CA = 19,
+    NETWORK_TYPE_NR = 20,
+} NETWORK_TYPE;
 
-static const char*
-mtk_radio_ext_ind_name(
-    guint32 ind)
-{
-    switch (ind) {
-#define IMS_RADIO_IND_(code, name, NAME) \
-        case IMS_RADIO_IND_##NAME: return #name;
-    IMS_RADIO_INDICATION_3_0(IMS_RADIO_IND_)
-#undef IMS_RADIO_IND_
-    }
-    return NULL;
-}
+typedef enum multival_req_islast {
+    ISLAST_NULL = -1,
+    ISLAST_FALSE = 0,
+    ISLAST_TRUE = 1,
+} MULTIVAL_REQ_ISLAST;
 
 #endif /* MTK_RADIO_EXT_TYPES_H */
 

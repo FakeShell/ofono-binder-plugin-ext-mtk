@@ -127,7 +127,47 @@ guint
 mtk_radio_ext_new_req_id()
 {
     static guint last_id = 0;
-    return last_id++;
+    // start from 1
+    return ++last_id;
+}
+
+static const char*
+mtk_radio_ext_req_name(
+    guint32 req)
+{
+    switch (req) {
+#define MTK_RADIO_REQ_(req, resp, name, NAME) \
+        case MTK_RADIO_REQ_##NAME: return #name;
+    MTK_RADIO_EXT_IMS_CALL_3_0(MTK_RADIO_REQ_)
+#undef MTK_RADIO_REQ_
+    }
+    return NULL;
+}
+
+static const char*
+mtk_radio_ext_resp_name(
+    guint32 resp)
+{
+    switch (resp) {
+#define IMS_RADIO_RESP_(req, resp, name, NAME) \
+        case IMS_RADIO_RESP_##NAME: return #name;
+    MTK_RADIO_EXT_IMS_CALL_3_0(IMS_RADIO_RESP_)
+#undef IMS_RADIO_RESP_
+    }
+    return NULL;
+}
+
+static const char*
+mtk_radio_ext_ind_name(
+    guint32 ind)
+{
+    switch (ind) {
+#define IMS_RADIO_IND_(code, name, NAME) \
+        case IMS_RADIO_IND_##NAME: return #name;
+    IMS_RADIO_INDICATION_3_0(IMS_RADIO_IND_)
+#undef IMS_RADIO_IND_
+    }
+    return NULL;
 }
 
 static
@@ -511,9 +551,15 @@ mtk_radio_ext_new(
     const char* slot)
 {
     MtkRadioExt* self = NULL;
+    int idx = 0;
+
+    if (!sscanf(slot, "slot%d", &idx)) {
+        DBG("Can't get the slot index from %s", slot);
+    }
 
     GBinderServiceManager* sm = gbinder_servicemanager_new(dev);
     if (sm) {
+        char* slot = g_strdup_printf("imsSlot%d", idx);
         char* fqname = g_strconcat(MTK_RADIO, "/", slot, NULL);
         GBinderRemoteObject* obj = /* autoreleased */
             gbinder_servicemanager_get_service_sync(sm, fqname, NULL);
@@ -521,9 +567,12 @@ mtk_radio_ext_new(
         if (obj) {
             DBG("Connected to %s", fqname);
             self = mtk_radio_ext_create(sm, obj, slot);
+        } else {
+            DBG("Failed to connect to %s", fqname);
         }
 
         g_free(fqname);
+        g_free(slot);
         gbinder_servicemanager_unref(sm);
     }
 
@@ -572,6 +621,41 @@ mtk_radio_ext_set_enabled(
         mtk_radio_ext_set_enabled_args,
         complete, destroy, user_data,
         enabled);
+}
+
+static
+void
+mtk_radio_ext_set_ims_cfg_feature_value_args(
+    GBinderWriter* args,
+    va_list va)
+{
+    // featureId
+    gbinder_writer_append_int32(args, va_arg(va, guint32));
+    // network
+    gbinder_writer_append_int32(args, va_arg(va, guint32));
+    // value
+    gbinder_writer_append_int32(args, va_arg(va, guint32));
+    // isLast
+    gbinder_writer_append_int32(args, va_arg(va, guint32));
+}
+
+guint
+mtk_radio_ext_set_ims_cfg_feature_value(
+    MtkRadioExt* self,
+    guint32 feature_id,
+    guint32 network,
+    guint32 value,
+    guint32 is_last,
+    MtkRadioExtResultFunc complete,
+    GDestroyNotify destroy,
+    void* user_data)
+{
+    return mtk_radio_ext_result_request_submit(self,
+        MTK_RADIO_REQ_SET_IMS_CFG_FEATURE_VALUE,
+        IMS_RADIO_RESP_SET_IMS_CFG_FEATURE_VALUE,
+        mtk_radio_ext_set_ims_cfg_feature_value_args,
+        complete, destroy, user_data,
+        feature_id, network, value, is_last);
 }
 
 /*==========================================================================*

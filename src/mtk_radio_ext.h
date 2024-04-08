@@ -46,6 +46,17 @@ mtk_radio_ext_set_enabled(
     GDestroyNotify destroy,
     void* user_data);
 
+guint
+mtk_radio_ext_set_ims_cfg_feature_value(
+    MtkRadioExt* self,
+    guint32 feature_id,
+    guint32 network,
+    guint32 value,
+    guint32 is_last,
+    MtkRadioExtResultFunc complete,
+    GDestroyNotify destroy,
+    void* user_data);
+
 #endif /* MTK_RADIO_EXT_H */
 
 /*
