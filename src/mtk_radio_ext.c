@@ -620,15 +620,9 @@ mtk_radio_ext_new(
     const char* slot)
 {
     MtkRadioExt* self = NULL;
-    int idx = 0;
-
-    if (!sscanf(slot, "slot%d", &idx)) {
-        DBG("Can't get the slot index from %s", slot);
-    }
-
     GBinderServiceManager* sm = gbinder_servicemanager_new(dev);
+
     if (sm) {
-        char* slot = g_strdup_printf("imsSlot%d", idx);
         char* fqname = g_strconcat(MTK_RADIO, "/", slot, NULL);
         GBinderRemoteObject* obj = /* autoreleased */
             gbinder_servicemanager_get_service_sync(sm, fqname, NULL);
@@ -641,7 +635,6 @@ mtk_radio_ext_new(
         }
 
         g_free(fqname);
-        g_free(slot);
         gbinder_servicemanager_unref(sm);
     }
 
@@ -664,6 +657,16 @@ mtk_radio_ext_unref(
 {
     if (G_LIKELY(self)) {
         g_object_unref(self);
+    }
+}
+
+void
+mtk_radio_ext_cancel(
+    MtkRadioExt* self,
+    guint id)
+{
+    if (G_LIKELY(self) && G_LIKELY(id)) {
+        g_hash_table_remove(self->requests, KEY(id));
     }
 }
 

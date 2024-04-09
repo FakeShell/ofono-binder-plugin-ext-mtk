@@ -36,6 +36,7 @@
  */
 
 #include "mtk_ims.h"
+#include "mtk_ims_call.h"
 #include "mtk_slot.h"
 #include "mtk_radio_ext.h"
 #include "mtk_radio_ext_types.h"
@@ -261,8 +262,8 @@ mtk_ims_iface_init(
 
 BinderExtIms*
 mtk_ims_new(
-    const char* dev,
-    const char* slot)
+    const char* slot,
+    MtkRadioExt* radio_ext)
 {
     MtkIms* self = g_object_new(THIS_TYPE, NULL);
 
@@ -271,7 +272,7 @@ mtk_ims_new(
      * on registration state change and emits SIGNAL_STATE_CHANGED.
      */
     self->slot = g_strdup(slot);
-    self->radio_ext = mtk_radio_ext_new(dev, slot);
+    self->radio_ext = mtk_radio_ext_ref(radio_ext);
     self->ims_state = BINDER_EXT_IMS_STATE_NOT_REGISTERED;
 
     if (self->radio_ext) {

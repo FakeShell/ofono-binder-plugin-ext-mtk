@@ -37,6 +37,8 @@
 
 #include "mtk_slot.h"
 #include "mtk_ims.h"
+#include "mtk_ims_call.h"
+#include "mtk_radio_ext.h"
 
 #include <binder_ext_slot_impl.h>
 
@@ -46,6 +48,8 @@ typedef BinderExtSlotClass MtkSlotClass;
 typedef struct mtk_slot {
     BinderExtSlot parent;
     BinderExtIms* ims;
+    BinderExtCall* ims_call;
+    MtkRadioExt* radio_ext;
 } MtkSlot;
 
 GType mtk_slot_get_type() G_GNUC_INTERNAL;
@@ -80,6 +84,8 @@ mtk_slot_get_interface(
 
     if (iface == BINDER_EXT_TYPE_IMS) {
         return self->ims;
+    } else if (iface == BINDER_EXT_TYPE_CALL) {
+        return self->ims_call;
     } else {
         return BINDER_EXT_SLOT_CLASS(PARENT_CLASS)->get_interface(slot, iface);
     }
@@ -105,8 +111,14 @@ mtk_slot_new(
 {
     MtkSlot* self = g_object_new(THIS_TYPE, NULL);
     BinderExtSlot* slot = &self->parent;
+    char* slot_name =  g_strdup_printf("imsSlot%d", radio->slot_index + 1);
 
-    self->ims = mtk_ims_new(radio->dev, radio->slot);
+    self->radio_ext = mtk_radio_ext_new(radio->dev, slot_name);
+    if (self->radio_ext) {
+        self->ims = mtk_ims_new(slot_name, self->radio_ext);
+        self->ims_call = mtk_ims_call_new(self->radio_ext);
+    }
+
     return slot;
 }
 

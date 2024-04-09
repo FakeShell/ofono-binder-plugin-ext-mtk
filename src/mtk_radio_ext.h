@@ -43,6 +43,11 @@ void
 mtk_radio_ext_unref(
     MtkRadioExt* self);
 
+void
+mtk_radio_ext_cancel(
+    MtkRadioExt* self,
+    guint id);
+
 guint
 mtk_radio_ext_set_enabled(
     MtkRadioExt* self,

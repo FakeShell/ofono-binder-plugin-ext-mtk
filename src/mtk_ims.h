@@ -40,10 +40,12 @@
 
 #include <binder_ext_ims.h>
 
+typedef struct mtk_radio_ext MtkRadioExt;
+
 BinderExtIms*
 mtk_ims_new(
-    const char* dev,
-    const char* slot)
+    const char* slot,
+    MtkRadioExt* radio_ext)
     G_GNUC_INTERNAL;
 
 #endif /* MTK_IMS_H */
