@@ -25,6 +25,11 @@ typedef void (*MtkRadioExtResultFunc)(
     int result,
     void* user_data);
 
+typedef void (*MtkRadioExtImsRegStatusFunc)(
+    MtkRadioExt* radio,
+    guint32 status,
+    void* user_data);
+
 MtkRadioExt*
 mtk_radio_ext_new(
     const char* dev,
@@ -55,6 +60,12 @@ mtk_radio_ext_set_ims_cfg_feature_value(
     guint32 is_last,
     MtkRadioExtResultFunc complete,
     GDestroyNotify destroy,
+    void* user_data);
+
+gulong
+mtk_radio_ext_add_ims_reg_status_handler(
+    MtkRadioExt* self,
+    MtkRadioExtImsRegStatusFunc handler,
     void* user_data);
 
 #endif /* MTK_RADIO_EXT_H */

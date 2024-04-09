@@ -152,6 +152,21 @@ typedef enum multival_req_islast {
     ISLAST_TRUE = 1,
 } MULTIVAL_REQ_ISLAST;
 
+typedef enum ims_reg_status_report_type {
+    IMS_REGISTERING,
+    IMS_REGISTERED,
+    IMS_REGISTER_FAIL
+} ImsRegStatusReportType;
+
+typedef struct ims_reg_status_info {
+    guint32 report_type RADIO_ALIGNED(4); /* ImsRegStatusReportType */
+    guint32 account_id RADIO_ALIGNED(4);
+    guint32 expire_time RADIO_ALIGNED(4);
+    guint32 error_code RADIO_ALIGNED(4);
+    GBinderHidlString uri RADIO_ALIGNED(8);
+    GBinderHidlString error_msg RADIO_ALIGNED(8);
+} ImsRegStatusInfo;
+
 #endif /* MTK_RADIO_EXT_TYPES_H */
 
 /*

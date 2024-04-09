@@ -52,6 +52,7 @@ typedef struct mtk_ims {
     GObject parent;
     char* slot;
     MtkRadioExt* radio_ext;
+    BINDER_EXT_IMS_STATE ims_state;
 } MtkIms;
 
 static
@@ -135,6 +136,36 @@ mtk_ims_result_request_destroy(
     mtk_ims_result_request_free(req);
 }
 
+static
+void
+mtk_ims_reg_status_changed(
+    MtkRadioExt* radio,
+    ImsRegStatusReportType status,
+    void* user_data)
+{
+    MtkIms* self = THIS(user_data);
+    BINDER_EXT_IMS_STATE ims_state;
+
+    switch (status) {
+    case IMS_REGISTERING:
+        ims_state = BINDER_EXT_IMS_STATE_REGISTERING;
+        break;
+    case IMS_REGISTERED:
+        ims_state = BINDER_EXT_IMS_STATE_REGISTERED;
+        break;
+    case IMS_REGISTER_FAIL:
+        ims_state = BINDER_EXT_IMS_STATE_NOT_REGISTERED;
+        break;
+    default:
+        ims_state = BINDER_EXT_IMS_STATE_UNKNOWN;
+    }
+
+    if (ims_state != self->ims_state) {
+        self->ims_state = ims_state;
+        g_signal_emit(self, mtk_ims_signals[SIGNAL_STATE_CHANGED], 0);
+    }
+}
+
 /*==========================================================================*
  * BinderExtImsInterface
  *==========================================================================*/
@@ -146,9 +177,8 @@ mtk_ims_get_state(
 {
     MtkIms* self = THIS(ext);
 
-    DBG("%s", self->slot);
-#pragma message("TODO: return the actual state")
-    return BINDER_EXT_IMS_STATE_UNKNOWN;
+    DBG("%s ims_state=%d", self->slot, self->ims_state);
+    return self->ims_state;
 }
 
 static
@@ -242,6 +272,12 @@ mtk_ims_new(
      */
     self->slot = g_strdup(slot);
     self->radio_ext = mtk_radio_ext_new(dev, slot);
+    self->ims_state = BINDER_EXT_IMS_STATE_NOT_REGISTERED;
+
+    if (self->radio_ext) {
+        mtk_radio_ext_add_ims_reg_status_handler(self->radio_ext,
+            mtk_ims_reg_status_changed, self);
+    }
 
     return BINDER_EXT_IMS(self);
 }

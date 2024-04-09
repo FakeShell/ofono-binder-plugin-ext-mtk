@@ -48,6 +48,15 @@ G_DEFINE_TYPE(MtkRadioExt, mtk_radio_ext, G_TYPE_OBJECT)
 #define PARENT_CLASS mtk_radio_ext_parent_class
 #define KEY(serial) GUINT_TO_POINTER(serial)
 
+enum mtk_radio_ext_signal {
+    SIGNAL_IMS_REG_STATUS_CHANGED,
+    SIGNAL_COUNT
+};
+
+#define SIGNAL_IMS_REG_STATUS_CHANGED_NAME    "mtk-radio-ext-ims-reg-status-changed"
+
+static guint mtk_radio_ext_signals[SIGNAL_COUNT] = { 0 };
+
 typedef struct mtk_radio_ext_request MtkRadioExtRequest;
 
 typedef void (*MtkRadioExtArgWriteFunc)(
@@ -271,6 +280,59 @@ mtk_radio_ext_dump_request(
 }
 
 static
+const ImsRegStatusInfo*
+mtk_radio_ext_read_ims_reg_status_info(
+    MtkRadioExt* self,
+    GBinderReader* reader)
+{
+    const ImsRegStatusInfo* info;
+
+    info = gbinder_reader_read_hidl_struct(reader, ImsRegStatusInfo);
+    if (info) {
+        const char *uri = info->uri.data.str ? info->uri.data.str : "";
+        const char *error_msg = info->error_msg.data.str ? info->error_msg.data.str : "";
+
+        DBG("%s: ImsRegStatusInfo report_type:%d account_id:%d"
+            " expire_time:%d error_code:%d\n"
+            " uri:%s error_msg:%s",
+            self->slot,
+            info->report_type,
+            info->account_id,
+            info->expire_time,
+            info->error_code,
+            uri, error_msg);
+
+        return info;
+    } else {
+        DBG("%s: failed to parse ImsRegStatusInfo", self->slot);
+        return NULL;
+    }
+}
+
+static
+void
+mtk_radio_ext_handle_ims_reg_status_report(
+    MtkRadioExt* self,
+    const GBinderReader* args)
+{
+    /* imsRegStatusReport(RadioIndicationType type, ImsRegStatusInfo report) */
+    GBinderReader reader;
+    guint32 type;
+
+    gbinder_reader_copy(&reader, args);
+    if (!gbinder_reader_read_uint32(&reader, &type)) {
+        DBG("%s: failed to parse imsRegStatusReport payload", self->slot);
+        return;
+    }
+
+    const ImsRegStatusInfo* info =
+        mtk_radio_ext_read_ims_reg_status_info(self, &reader);
+
+    g_signal_emit(self, mtk_radio_ext_signals[SIGNAL_IMS_REG_STATUS_CHANGED],
+                    0, info->report_type);
+}
+
+static
 GBinderLocalReply*
 mtk_radio_ext_indication(
     GBinderLocalObject* obj,
@@ -288,7 +350,14 @@ mtk_radio_ext_indication(
     mtk_radio_ext_log_ind(self, code);
     mtk_radio_ext_dump_data(&args);
 
-#pragma message("TODO: implement indication handling")
+    if (g_str_equal(iface, MTK_RADIO_INDICATION)) {
+        switch(code) {
+        case IMS_RADIO_IND_IMS_REG_STATUS_REPORT:
+            mtk_radio_ext_handle_ims_reg_status_report(self, &args);
+            return NULL;
+        }
+    }
+
     DBG("Unexpected indication %s %u", iface, code);
     *status = GBINDER_STATUS_FAILED;
 
@@ -658,6 +727,16 @@ mtk_radio_ext_set_ims_cfg_feature_value(
         feature_id, network, value, is_last);
 }
 
+gulong
+mtk_radio_ext_add_ims_reg_status_handler(
+    MtkRadioExt* self,
+    MtkRadioExtImsRegStatusFunc handler,
+    void* user_data)
+{
+    return (G_LIKELY(self) && G_LIKELY(handler)) ? g_signal_connect(self,
+        SIGNAL_IMS_REG_STATUS_CHANGED_NAME, G_CALLBACK(handler), user_data) : 0;
+}
+
 /*==========================================================================*
  * Internals
  *==========================================================================*/
@@ -689,6 +768,10 @@ mtk_radio_ext_class_init(
     MtkRadioExtClass* klass)
 {
     G_OBJECT_CLASS(klass)->finalize = mtk_radio_ext_finalize;
+    mtk_radio_ext_signals[SIGNAL_IMS_REG_STATUS_CHANGED] =
+        g_signal_new(SIGNAL_IMS_REG_STATUS_CHANGED_NAME, G_OBJECT_CLASS_TYPE(klass),
+            G_SIGNAL_RUN_FIRST, 0, NULL, NULL, NULL, G_TYPE_NONE,
+            1, G_TYPE_UINT);
 }
 
 /*
