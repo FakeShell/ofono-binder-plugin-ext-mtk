@@ -19,6 +19,7 @@
 #include <radio_types.h>
 
 typedef struct mtk_radio_ext MtkRadioExt;
+typedef enum call_info_msg_type CallInfoMsgType;
 
 typedef void (*MtkRadioExtResultFunc)(
     MtkRadioExt* radio,
@@ -27,7 +28,15 @@ typedef void (*MtkRadioExtResultFunc)(
 
 typedef void (*MtkRadioExtImsRegStatusFunc)(
     MtkRadioExt* radio,
-    guint32 status,
+    guint status,
+    void* user_data);
+
+typedef void (*MtkRadioExtCallInfoFunc)(
+    MtkRadioExt* radio,
+    guint call_id,
+    CallInfoMsgType msg_type,
+    guint call_mode,
+    char* number,
     void* user_data);
 
 MtkRadioExt*
@@ -71,6 +80,12 @@ gulong
 mtk_radio_ext_add_ims_reg_status_handler(
     MtkRadioExt* self,
     MtkRadioExtImsRegStatusFunc handler,
+    void* user_data);
+
+gulong
+mtk_radio_ext_add_call_info_handler(
+    MtkRadioExt* self,
+    MtkRadioExtCallInfoFunc handler,
     void* user_data);
 
 #endif /* MTK_RADIO_EXT_H */

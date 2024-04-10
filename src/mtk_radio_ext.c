@@ -50,10 +50,12 @@ G_DEFINE_TYPE(MtkRadioExt, mtk_radio_ext, G_TYPE_OBJECT)
 
 enum mtk_radio_ext_signal {
     SIGNAL_IMS_REG_STATUS_CHANGED,
+    SIGNAL_CALL_INFO,
     SIGNAL_COUNT
 };
 
 #define SIGNAL_IMS_REG_STATUS_CHANGED_NAME    "mtk-radio-ext-ims-reg-status-changed"
+#define SIGNAL_CALL_INFO_NAME                 "mtk-radio-ext-call-info"
 
 static guint mtk_radio_ext_signals[SIGNAL_COUNT] = { 0 };
 
@@ -280,18 +282,132 @@ mtk_radio_ext_dump_request(
 }
 
 static
+gulong
+mtk_radio_ext_call(
+    MtkRadioExt* self,
+    gint32 code,
+    gint32 serial,
+    GBinderLocalRequest* req,
+    GBinderClientReplyFunc reply,
+    GDestroyNotify destroy,
+    void* user_data)
+{
+    mtk_radio_ext_log_req(self, code, serial);
+    mtk_radio_ext_dump_request(req);
+
+    return gbinder_client_transact(self->client, code,
+        GBINDER_TX_FLAG_ONEWAY, req, reply, destroy, user_data);
+}
+
+#define MAYBE_HIDL_STRING(hstr) ((hstr).data.str ? (hstr).data.str : "")
+
+static
+const IncomingCallNotification*
+mtk_radio_ext_read_incoming_call_notification(
+    MtkRadioExt* self,
+    const GBinderReader* args)
+{
+    GBinderReader reader;
+    const IncomingCallNotification* notification;
+
+    gbinder_reader_copy(&reader, args);
+    notification = gbinder_reader_read_hidl_struct(&reader, IncomingCallNotification);
+    if (notification) {
+        DBG("%s: IncomingCallNotification callId:%s number:%s type:%s\n"
+            "callMode:%s seqNo:%s redirectNumber:%s toNumber:%s",
+            self->slot,
+            MAYBE_HIDL_STRING(notification->callId),
+            MAYBE_HIDL_STRING(notification->number),
+            MAYBE_HIDL_STRING(notification->type),
+            MAYBE_HIDL_STRING(notification->callMode),
+            MAYBE_HIDL_STRING(notification->seqNo),
+            MAYBE_HIDL_STRING(notification->redirectNumber),
+            MAYBE_HIDL_STRING(notification->toNumber));
+        return notification;
+    } else {
+        DBG("%s: failed to parse IncomingCallNotification", self->slot);
+        return NULL;
+    }
+}
+
+static
+void
+mtk_radio_ext_handle_incoming_call_indication(
+    MtkRadioExt* self,
+    const GBinderReader* args)
+{
+    /* incomingCallIndication(RadioIndicationType type, IncomingCallNotification inCallNotify) */
+    const IncomingCallNotification* notification =
+        mtk_radio_ext_read_incoming_call_notification(self, args);
+
+    if (notification) {
+        /* Allow incoming call via setCallIndication */
+        /* setCallIndication(int32_t serial, int32_t mode, int32_t callId, int32_t seqNumber, int32_t cause) */
+        const guint code = MTK_RADIO_REQ_SET_CALL_INDICATION;
+        GBinderClient* client = self->client;
+        GBinderLocalRequest* req = gbinder_client_new_request2(client, code);
+        GBinderWriter writer;
+        guint serial = mtk_radio_ext_new_req_id();
+
+        gbinder_local_request_init_writer(req, &writer);
+        gbinder_writer_append_int32(&writer, serial); /* serial */
+        gbinder_writer_append_int32(&writer, IMS_ALLOW_INCOMING_CALL_INDICATION); /* mode */
+        gbinder_writer_append_int32(&writer, atoi(MAYBE_HIDL_STRING(notification->callId))); /* callId */
+        gbinder_writer_append_int32(&writer, atoi(MAYBE_HIDL_STRING(notification->seqNo))); /* seqNumber */
+        gbinder_writer_append_int32(&writer, -1); /* cause = unknown? */
+
+        mtk_radio_ext_call(self, code, serial, req, NULL, NULL, NULL);
+        gbinder_local_request_unref(req);
+    }
+}
+
+static
+void
+mtk_radio_ext_handle_call_info_indication(
+    MtkRadioExt* self,
+    const GBinderReader* args)
+{
+    /* callInfoIndication(RadioIndicationType type, vec<string> data) */
+    GBinderReader reader;
+    char** data;
+
+    gbinder_reader_copy(&reader, args);
+    data = gbinder_reader_read_hidl_string_vec(&reader);
+
+    if (data && g_strv_length(data) >= 6) {
+        /* +ECPI:<call_id>, <msg_type>, <is_ibt>, <is_tch>,
+         *       <dir>, <call_mode>, <number>, <toa>, [<cause>] */
+
+        /* other values seem to be hardcoded sender side and irrelevant for us */
+        guint call_id = atoi(data[0]);
+        guint msg_type = atoi(data[1]);
+        guint call_mode = atoi(data[5]);
+        char* number = data[6];
+
+        DBG("%s: callInfoIndication callId:%d msgType:%d callMode:%d number:%s",
+            self->slot, call_id, msg_type, call_mode, number);
+
+        g_signal_emit(self, mtk_radio_ext_signals[SIGNAL_CALL_INFO],
+                      0, call_id, msg_type, call_mode, number);
+
+        g_strfreev(data);
+    } else {
+        DBG("%s: failed to parse callInfoIndication data", self->slot);
+    }
+}
+
+static
 const ImsRegStatusInfo*
 mtk_radio_ext_read_ims_reg_status_info(
     MtkRadioExt* self,
-    GBinderReader* reader)
+    const GBinderReader* args)
 {
+    GBinderReader reader;
     const ImsRegStatusInfo* info;
 
-    info = gbinder_reader_read_hidl_struct(reader, ImsRegStatusInfo);
+    gbinder_reader_copy(&reader, args);
+    info = gbinder_reader_read_hidl_struct(&reader, ImsRegStatusInfo);
     if (info) {
-        const char *uri = info->uri.data.str ? info->uri.data.str : "";
-        const char *error_msg = info->error_msg.data.str ? info->error_msg.data.str : "";
-
         DBG("%s: ImsRegStatusInfo report_type:%d account_id:%d"
             " expire_time:%d error_code:%d\n"
             " uri:%s error_msg:%s",
@@ -300,8 +416,8 @@ mtk_radio_ext_read_ims_reg_status_info(
             info->account_id,
             info->expire_time,
             info->error_code,
-            uri, error_msg);
-
+            MAYBE_HIDL_STRING(info->uri),
+            MAYBE_HIDL_STRING(info->error_msg));
         return info;
     } else {
         DBG("%s: failed to parse ImsRegStatusInfo", self->slot);
@@ -316,17 +432,8 @@ mtk_radio_ext_handle_ims_reg_status_report(
     const GBinderReader* args)
 {
     /* imsRegStatusReport(RadioIndicationType type, ImsRegStatusInfo report) */
-    GBinderReader reader;
-    guint32 type;
-
-    gbinder_reader_copy(&reader, args);
-    if (!gbinder_reader_read_uint32(&reader, &type)) {
-        DBG("%s: failed to parse imsRegStatusReport payload", self->slot);
-        return;
-    }
-
     const ImsRegStatusInfo* info =
-        mtk_radio_ext_read_ims_reg_status_info(self, &reader);
+        mtk_radio_ext_read_ims_reg_status_info(self, args);
 
     g_signal_emit(self, mtk_radio_ext_signals[SIGNAL_IMS_REG_STATUS_CHANGED],
                     0, info->report_type);
@@ -351,11 +458,24 @@ mtk_radio_ext_indication(
     mtk_radio_ext_dump_data(&args);
 
     if (g_str_equal(iface, MTK_RADIO_INDICATION)) {
-        switch(code) {
-        case IMS_RADIO_IND_IMS_REG_STATUS_REPORT:
-            mtk_radio_ext_handle_ims_reg_status_report(self, &args);
-            return NULL;
+        guint type;
+        if (gbinder_reader_read_uint32(&args, &type)) {
+            switch(code) {
+            case IMS_RADIO_IND_INCOMING_CALL_INDICATION:
+                mtk_radio_ext_handle_incoming_call_indication(self, &args);
+                return NULL;
+            case IMS_RADIO_IND_CALL_INFO_INDICATION:
+                mtk_radio_ext_handle_call_info_indication(self, &args);
+                return NULL;
+            case IMS_RADIO_IND_IMS_REG_STATUS_REPORT:
+                mtk_radio_ext_handle_ims_reg_status_report(self, &args);
+                return NULL;
+            }
+        } else {
+            DBG("Failed to decode indication %s %u", iface, code);
+            *status = GBINDER_STATUS_FAILED;
         }
+        // TODO: ack type == RADIO_IND_ACK_EXP indications
     }
 
     DBG("Unexpected indication %s %u", iface, code);
@@ -499,24 +619,6 @@ mtk_radio_ext_request_sent(
     void* user_data)
 {
     ((MtkRadioExtRequest*)user_data)->tx = 0;
-}
-
-static
-gulong
-mtk_radio_ext_call(
-    MtkRadioExt* self,
-    gint32 code,
-    gint32 serial,
-    GBinderLocalRequest* req,
-    GBinderClientReplyFunc reply,
-    GDestroyNotify destroy,
-    void* user_data)
-{
-    mtk_radio_ext_log_req(self, code, serial);
-    mtk_radio_ext_dump_request(req);
-
-    return gbinder_client_transact(self->client, code,
-        GBINDER_TX_FLAG_ONEWAY, req, reply, destroy, user_data);
 }
 
 static
@@ -740,6 +842,16 @@ mtk_radio_ext_add_ims_reg_status_handler(
         SIGNAL_IMS_REG_STATUS_CHANGED_NAME, G_CALLBACK(handler), user_data) : 0;
 }
 
+gulong
+mtk_radio_ext_add_call_info_handler(
+    MtkRadioExt* self,
+    MtkRadioExtCallInfoFunc handler,
+    void* user_data)
+{
+    return (G_LIKELY(self) && G_LIKELY(handler)) ? g_signal_connect(self,
+        SIGNAL_CALL_INFO_NAME, G_CALLBACK(handler), user_data) : 0;
+}
+
 /*==========================================================================*
  * Internals
  *==========================================================================*/
@@ -775,6 +887,10 @@ mtk_radio_ext_class_init(
         g_signal_new(SIGNAL_IMS_REG_STATUS_CHANGED_NAME, G_OBJECT_CLASS_TYPE(klass),
             G_SIGNAL_RUN_FIRST, 0, NULL, NULL, NULL, G_TYPE_NONE,
             1, G_TYPE_UINT);
+    mtk_radio_ext_signals[SIGNAL_CALL_INFO] =
+        g_signal_new(SIGNAL_CALL_INFO_NAME, G_OBJECT_CLASS_TYPE(klass),
+            G_SIGNAL_RUN_FIRST, 0, NULL, NULL, NULL, G_TYPE_NONE,
+            4, G_TYPE_UINT, G_TYPE_UINT, G_TYPE_UINT, G_TYPE_STRING);
 }
 
 /*

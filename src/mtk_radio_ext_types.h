@@ -25,6 +25,7 @@
 /* c(req, resp, callName, CALL_NAME) */
 #define MTK_RADIO_EXT_IMS_CALL_3_0(c) \
     c(14, 7, setImsEnabled, SET_IMS_ENABLED) \
+    c(49, 2, setCallIndication, SET_CALL_INDICATION) \
     c(151, 43, setImsCfgFeatureValue, SET_IMS_CFG_FEATURE_VALUE)
 
 typedef enum mtk_radio_req {
@@ -152,11 +153,38 @@ typedef enum multival_req_islast {
     ISLAST_TRUE = 1,
 } MULTIVAL_REQ_ISLAST;
 
+enum incoming_call_indication_mode {
+    IMS_ALLOW_INCOMING_CALL_INDICATION = 0,
+    IMS_DISALLOW_INCOMING_CALL_INDICATION = 1,
+};
+
 typedef enum ims_reg_status_report_type {
     IMS_REGISTERING,
     IMS_REGISTERED,
     IMS_REGISTER_FAIL
 } ImsRegStatusReportType;
+
+typedef enum call_info_msg_type {
+    CALL_INFO_MSG_TYPE_SETUP = 0,
+    CALL_INFO_MSG_TYPE_ALERT = 2,
+    CALL_INFO_MSG_TYPE_CONNECTED = 6,
+    CALL_INFO_MSG_TYPE_MO_CALL_ID_ASSIGN = 130,
+    CALL_INFO_MSG_TYPE_HELD = 131,
+    CALL_INFO_MSG_TYPE_ACTIVE = 132,
+    CALL_INFO_MSG_TYPE_DISCONNECTED = 133,
+    CALL_INFO_MSG_TYPE_REMOTE_HOLD = 135,
+    CALL_INFO_MSG_TYPE_REMOTE_RESUME = 136
+} CallInfoMsgType;
+
+typedef struct incoming_call_notification {
+    GBinderHidlString callId RADIO_ALIGNED(8);
+    GBinderHidlString number RADIO_ALIGNED(8);
+    GBinderHidlString type RADIO_ALIGNED(8);
+    GBinderHidlString callMode RADIO_ALIGNED(8);
+    GBinderHidlString seqNo RADIO_ALIGNED(8);
+    GBinderHidlString redirectNumber RADIO_ALIGNED(8);
+    GBinderHidlString toNumber RADIO_ALIGNED(8);
+} IncomingCallNotification;
 
 typedef struct ims_reg_status_info {
     guint32 report_type RADIO_ALIGNED(4); /* ImsRegStatusReportType */

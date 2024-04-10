@@ -136,6 +136,99 @@ mtk_ims_call_result_request_destroy(
     mtk_ims_call_result_request_unref(req);
 }
 
+/* internal use only */
+#define BINDER_EXT_CALL_STATE_DISCONNECTED (BINDER_EXT_CALL_STATE_INVALID - 1)
+
+static
+BINDER_EXT_CALL_STATE
+mtk_ims_call_msg_type_to_state(
+    CallInfoMsgType msg_type)
+{
+    switch (msg_type) {
+    case CALL_INFO_MSG_TYPE_SETUP:
+        return BINDER_EXT_CALL_STATE_INCOMING;
+    case CALL_INFO_MSG_TYPE_ALERT:
+        return BINDER_EXT_CALL_STATE_ALERTING;
+    case CALL_INFO_MSG_TYPE_CONNECTED:
+        return BINDER_EXT_CALL_STATE_ACTIVE;
+    case CALL_INFO_MSG_TYPE_HELD:
+        return BINDER_EXT_CALL_STATE_HOLDING;
+    case CALL_INFO_MSG_TYPE_ACTIVE:
+        return BINDER_EXT_CALL_STATE_ACTIVE;
+    case CALL_INFO_MSG_TYPE_DISCONNECTED:
+        return BINDER_EXT_CALL_STATE_DISCONNECTED;
+    case CALL_INFO_MSG_TYPE_REMOTE_HOLD:
+        return BINDER_EXT_CALL_STATE_WAITING;
+    case CALL_INFO_MSG_TYPE_REMOTE_RESUME:
+        return BINDER_EXT_CALL_STATE_ACTIVE;
+    default:
+        return BINDER_EXT_CALL_STATE_INVALID;
+    }
+}
+
+static
+BinderExtCallInfo*
+mtk_ims_call_info_new(
+    guint call_id,
+    guint call_mode,
+    char* number)
+{
+    const gsize number_len = strlen(number);
+    const gsize total = G_ALIGN8(sizeof(BinderExtCallInfo)) +
+        G_ALIGN8(number_len + 1);
+    BinderExtCallInfo* dest = g_malloc0(total);
+    char* ptr = ((char*)dest) + G_ALIGN8(sizeof(BinderExtCallInfo));
+
+    dest->call_id = call_id;
+    dest->name = NULL;
+    dest->state = BINDER_EXT_CALL_STATE_INVALID;
+    dest->type = BINDER_EXT_CALL_TYPE_VOICE;
+    dest->flags = BINDER_EXT_CALL_FLAG_IMS | BINDER_EXT_CALL_FLAG_INCOMING;
+
+    dest->number = ptr;
+    memcpy(ptr, number, number_len);
+    ptr += G_ALIGN8(number_len + 1);
+
+    return dest;
+}
+
+static
+void
+mtk_ims_call_handle_call_info(
+    MtkRadioExt* radio,
+    guint call_id,
+    CallInfoMsgType msg_type,
+    guint call_mode,
+    char* number,
+    void* user_data)
+{
+    MtkImsCall* self = THIS(user_data);
+    BinderExtCallInfo* call = NULL;
+
+    for (int i = 0; i < self->calls->len; i++) {
+        BinderExtCallInfo* info =
+            (BinderExtCallInfo*) g_ptr_array_index(self->calls, i);
+        if (info->call_id == call_id) {
+            call = info;
+            break;
+        }
+    }
+    if (!call) {
+        call = mtk_ims_call_info_new(call_id, call_mode, number);
+        g_ptr_array_add(self->calls, call);
+    }
+    call->state = mtk_ims_call_msg_type_to_state(msg_type);
+
+    if (msg_type == CALL_INFO_MSG_TYPE_DISCONNECTED) {
+        g_signal_emit(THIS(user_data),
+                      mtk_ims_call_signals[SIGNAL_CALL_DISCONNECTED], 0, call_id, "");
+        g_ptr_array_remove(self->calls, call);
+    }
+
+    g_signal_emit(THIS(user_data),
+                  mtk_ims_call_signals[SIGNAL_CALL_STATE_CHANGED], 0);
+}
+
 /*==========================================================================*
  * BinderExtCallInterface
  *==========================================================================*/
@@ -327,6 +420,9 @@ mtk_ims_call_new(
 
         self->radio_ext = mtk_radio_ext_ref(radio_ext);
         self->calls = g_ptr_array_new_with_free_func(g_free);
+
+        mtk_radio_ext_add_call_info_handler(radio_ext,
+                mtk_ims_call_handle_call_info, self);
 
         return BINDER_EXT_CALL(self);
     }
