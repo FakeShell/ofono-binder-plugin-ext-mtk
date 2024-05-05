@@ -1,0 +1,21 @@
+Source: ofono-binder-plugin-ext-mtk
+Section: libs
+Priority: optional
+Maintainer: Bardia Moshiri <fakeshell@bardia.tech>
+Build-Depends: debhelper-compat (= 13),
+               libglib2.0-dev (>= 2.0),
+               libglibutil-dev,
+               libgbinder-dev,
+               libgbinder-radio-dev,
+               ofono-dev,
+               libofonobinderpluginext-dev
+Standards-Version: 4.6.1
+
+Package: ofono-binder-plugin-ext-mtk
+Section: libs
+Architecture: any
+Depends: ${shlibs:Depends},
+         ${misc:Depends},
+Description: MTK IRadio extension for ofono-binder-plugin
+ Extends ofono-binder-plugin to interface with IMS
+ implementation on devices that provide MtkRadioExt.
