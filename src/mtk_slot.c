@@ -42,6 +42,7 @@
 
 #include <binder_ext_slot_impl.h>
 
+#include <radio_client.h>
 #include <radio_instance.h>
 
 typedef BinderExtSlotClass MtkSlotClass;
@@ -50,6 +51,8 @@ typedef struct mtk_slot {
     BinderExtIms* ims;
     BinderExtCall* ims_call;
     MtkRadioExt* radio_ext;
+    RadioInstance* ims_aosp_instance;
+    RadioClient* ims_aosp_client;
 } MtkSlot;
 
 GType mtk_slot_get_type() G_GNUC_INTERNAL;
@@ -112,11 +115,23 @@ mtk_slot_new(
     MtkSlot* self = g_object_new(THIS_TYPE, NULL);
     BinderExtSlot* slot = &self->parent;
     char* slot_name =  g_strdup_printf("imsSlot%d", radio->slot_index + 1);
+    char* aosp_slot_name =  g_strdup_printf("imsAospSlot%d", radio->slot_index + 1);
 
     self->radio_ext = mtk_radio_ext_new(radio->dev, slot_name);
+
+    // Connect to imsAospSlotN on the IRadio interface
+    self->ims_aosp_instance = radio_instance_new_with_modem_slot_and_version(
+        radio->dev, aosp_slot_name, radio->modem, radio->slot_index, radio->version);
+
+    self->ims_aosp_client = radio_client_new(self->ims_aosp_instance);
+
+    /* Not getting rilConnected indication on imsAospSlot, so force it */
+    self->ims_aosp_instance->connected = TRUE;
+    radio_instance_set_enabled(self->ims_aosp_instance, TRUE);
+
     if (self->radio_ext) {
         self->ims = mtk_ims_new(slot_name, self->radio_ext);
-        self->ims_call = mtk_ims_call_new(self->radio_ext);
+        self->ims_call = mtk_ims_call_new(self->radio_ext, self->ims_aosp_client);
     }
 
     return slot;

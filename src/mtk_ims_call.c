@@ -24,6 +24,12 @@
 
 #include <ofono/log.h>
 
+#include <radio_client.h>
+#include <radio_request.h>
+
+#include <gbinder_reader.h>
+#include <gbinder_writer.h>
+
 #include <gutil_idlepool.h>
 #include <gutil_macros.h>
 #include <gutil_misc.h>
@@ -33,6 +39,7 @@ typedef struct mtk_ims_call {
     GObject parent;
     GUtilIdlePool* pool;
     MtkRadioExt* radio_ext;
+    RadioClient* ims_aosp_client;
     GPtrArray* calls;
     GHashTable* id_map;
 } MtkImsCall;
@@ -78,6 +85,49 @@ enum mtk_ims_call_signal {
 #define SIGNAL_CALL_SUPP_SVC_NOTIFY_NAME  "mtk-ims-call-supp-svc-notify"
 
 static guint mtk_ims_call_signals[SIGNAL_COUNT] = { 0 };
+
+/* From ofono-binder-plugin's binder-util.c */
+static
+void
+binder_copy_hidl_string(
+    GBinderWriter* writer,
+    GBinderHidlString* dest,
+    const char* src)
+{
+    gssize len = src ? strlen(src) : 0;
+    dest->owns_buffer = TRUE;
+    if (len > 0) {
+        /* GBinderWriter takes ownership of the string contents */
+        dest->len = (guint32) len;
+        dest->data.str = gbinder_writer_memdup(writer, src, len + 1);
+    } else {
+        /* Replace NULL strings with empty strings */
+        dest->data.str = "";
+        dest->len = 0;
+    }
+}
+
+static
+void
+binder_append_hidl_string_with_parent(
+    GBinderWriter* writer,
+    const GBinderHidlString* str,
+    guint32 index,
+    guint32 offset)
+{
+    GBinderParent parent;
+
+    parent.index = index;
+    parent.offset = offset;
+
+    /* Strings are NULL-terminated, hence len + 1 */
+    gbinder_writer_append_buffer_object_with_parent(writer, str->data.str,
+        str->len + 1, &parent);
+}
+
+#define binder_append_hidl_string_data(writer,ptr,field,index) \
+    binder_append_hidl_string_with_parent(writer, &ptr->field, index, \
+        ((guint8*)(&ptr->field) - (guint8*)ptr))
 
 static
 MtkImsCallResultRequest*
@@ -134,6 +184,24 @@ mtk_ims_call_result_request_destroy(
     gpointer req)
 {
     mtk_ims_call_result_request_unref(req);
+}
+
+static
+void
+mtk_ims_call_radio_request_complete(
+    RadioRequest* req,
+    RADIO_TX_STATUS status,
+    RADIO_RESP resp,
+    RADIO_ERROR error,
+    const GBinderReader* args,
+    gpointer user_data)
+{
+    MtkImsCallResultRequest* result_req = user_data;
+
+    if (result_req->complete) {
+        result_req->complete(result_req->ext, error ? BINDER_EXT_CALL_RESULT_ERROR :
+            BINDER_EXT_CALL_RESULT_OK, result_req->user_data);
+    }
 }
 
 /* internal use only */
@@ -204,6 +272,12 @@ mtk_ims_call_handle_call_info(
 {
     MtkImsCall* self = THIS(user_data);
     BinderExtCallInfo* call = NULL;
+    BINDER_EXT_CALL_STATE state = mtk_ims_call_msg_type_to_state(msg_type);
+
+    if (state == BINDER_EXT_CALL_STATE_INVALID) {
+        /* Do not report unhandled call states to ofono */
+        return;
+    }
 
     for (int i = 0; i < self->calls->len; i++) {
         BinderExtCallInfo* info =
@@ -256,8 +330,51 @@ mtk_ims_call_dial(
     GDestroyNotify destroy,
     void* user_data)
 {
-    DBG("dial is not implemented yet");
-    return 0;
+    MtkImsCall* self = THIS(ext);
+
+    /* Mostly duplicated from ofono-binder-plugin's binder_voicecall_dial */
+    // TODO: can we call back into ofono-binder-plugin with imsAospSlot instead?
+    GBinderParent parent;
+    RadioDial* dialInfo;
+    GBinderWriter writer;
+    RadioRequest* req;
+    MtkImsCallResultRequest* result_req = NULL;
+
+    result_req = mtk_ims_call_result_request_new(ext, complete, destroy,
+                                                 user_data);
+
+    /* dial(int32 serial, Dial dialInfo) */
+    req = radio_request_new(self->ims_aosp_client, RADIO_REQ_DIAL, &writer,
+        mtk_ims_call_radio_request_complete,
+        mtk_ims_call_result_request_destroy, result_req);
+
+    /* Prepare the Dial structure */
+    dialInfo = gbinder_writer_new0(&writer, RadioDial);
+    dialInfo->clir = clir;
+    binder_copy_hidl_string(&writer, &dialInfo->address, number);
+
+    /* Write the parent structure */
+    parent.index = gbinder_writer_append_buffer_object(&writer, dialInfo,
+        sizeof(*dialInfo));
+
+    /* Write the string data */
+    binder_append_hidl_string_data(&writer, dialInfo, address, parent.index);
+
+    /* UUS information is empty but we still need to write a buffer */
+    parent.offset = G_STRUCT_OFFSET(RadioDial, uusInfo.data.ptr);
+    gbinder_writer_append_buffer_object_with_parent(&writer, NULL, 0, &parent);
+
+    // result_req = mtk_ims_call_result_request_new(ext, complete, destroy, user_data);
+
+    /* Submit the request */
+    if (radio_request_submit(req)) {
+        radio_request_unref(req);
+        return 1; /* not the actual serial, but return something non-null */
+    } else {
+        mtk_ims_call_result_request_unref(result_req);
+        radio_request_unref(req);
+        return 0;
+    }
 }
 
 static
@@ -413,12 +530,14 @@ mtk_ims_call_iface_init(
 
 BinderExtCall*
 mtk_ims_call_new(
-    MtkRadioExt* radio_ext)
+    MtkRadioExt* radio_ext,
+    RadioClient* ims_aosp_client)
 {
     if (G_LIKELY(radio_ext)) {
         MtkImsCall* self = g_object_new(THIS_TYPE, NULL);
 
         self->radio_ext = mtk_radio_ext_ref(radio_ext);
+        self->ims_aosp_client = radio_client_ref(ims_aosp_client);
         self->calls = g_ptr_array_new_with_free_func(g_free);
 
         mtk_radio_ext_add_call_info_handler(radio_ext,
@@ -441,6 +560,7 @@ mtk_ims_call_finalize(
     MtkImsCall* self = THIS(object);
 
     mtk_radio_ext_unref(self->radio_ext);
+    radio_client_unref(self->ims_aosp_client);
     gutil_idle_pool_destroy(self->pool);
     gutil_ptrv_free((void**)self->calls);
     g_hash_table_unref(self->id_map);

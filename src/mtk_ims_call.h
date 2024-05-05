@@ -19,10 +19,12 @@
 #include <binder_ext_call.h>
 
 typedef struct mtk_radio_ext MtkRadioExt;
+typedef struct radio_client RadioClient;
 
 BinderExtCall*
 mtk_ims_call_new(
-    MtkRadioExt* ims_radio)
+    MtkRadioExt* radio_ext,
+    RadioClient* ims_aosp_client)
     G_GNUC_INTERNAL;
 
 #endif /* MTK_IMS_CALL_H */
