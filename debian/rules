@@ -11,3 +11,7 @@ override_dh_auto_build:
 
 %:
 	dh $@
+
+override_dh_auto_install:
+	install -D -m 644 mtk.conf $(CURDIR)/debian/ofono-binder-plugin-ext-mtk/usr/share/ofono-binder-plugin-ext-mtk/mtk.conf
+	dh_auto_install
