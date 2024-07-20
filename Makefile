@@ -12,7 +12,7 @@ OFONO_PKG ?= ofono
 # on all platforms.
 #
 
-LDPKGS = libofonobinderpluginext libgbinder-radio libgbinder libglibutil gobject-2.0 glib-2.0
+LDPKGS = libofonobinderpluginext libgbinder-radio libgbinder libglibutil gobject-2.0 glib-2.0 libandroid-properties
 PKGS = $(OFONO_PKG) $(LDPKGS)
 
 #
