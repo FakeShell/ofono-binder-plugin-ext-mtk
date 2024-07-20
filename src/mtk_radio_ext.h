@@ -76,6 +76,19 @@ mtk_radio_ext_set_ims_cfg_feature_value(
     GDestroyNotify destroy,
     void* user_data);
 
+guint
+mtk_radio_ext_set_ims_cfg(
+    MtkRadioExt* self,
+    gboolean volte_enable,
+    gboolean vilte_enable,
+    gboolean vowifi_enable,
+    gboolean viwifi_enable,
+    gboolean sms_enable,
+    gboolean eims_enable,
+    MtkRadioExtResultFunc complete,
+    GDestroyNotify destroy,
+    void* user_data);
+
 gulong
 mtk_radio_ext_add_ims_reg_status_handler(
     MtkRadioExt* self,

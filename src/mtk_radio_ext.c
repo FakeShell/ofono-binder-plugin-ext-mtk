@@ -832,6 +832,48 @@ mtk_radio_ext_set_ims_cfg_feature_value(
         feature_id, network, value, is_last);
 }
 
+static
+void
+mtk_radio_ext_set_ims_cfg_args(
+    GBinderWriter* args,
+    va_list va)
+{
+    // volteEnable
+    gbinder_writer_append_bool(args, va_arg(va, gboolean));
+    // vilteEnable
+    gbinder_writer_append_bool(args, va_arg(va, gboolean));
+    // vowifiEnable
+    gbinder_writer_append_bool(args, va_arg(va, gboolean));
+    // viwifiEnable
+    gbinder_writer_append_bool(args, va_arg(va, gboolean));
+    // smsEnable
+    gbinder_writer_append_bool(args, va_arg(va, gboolean));
+    // eimsEnable
+    gbinder_writer_append_bool(args, va_arg(va, gboolean));
+}
+
+guint
+mtk_radio_ext_set_ims_cfg(
+    MtkRadioExt* self,
+    gboolean volte_enable,
+    gboolean vilte_enable,
+    gboolean vowifi_enable,
+    gboolean viwifi_enable,
+    gboolean sms_enable,
+    gboolean eims_enable,
+    MtkRadioExtResultFunc complete,
+    GDestroyNotify destroy,
+    void* user_data)
+{
+    return mtk_radio_ext_result_request_submit(self,
+        MTK_RADIO_REQ_SET_IMS_CFG,
+        IMS_RADIO_RESP_SET_IMS_CFG,
+        mtk_radio_ext_set_ims_cfg_args,
+        complete, destroy, user_data,
+        volte_enable, vilte_enable, vowifi_enable,
+        viwifi_enable, sms_enable, eims_enable);
+}
+
 gulong
 mtk_radio_ext_add_ims_reg_status_handler(
     MtkRadioExt* self,

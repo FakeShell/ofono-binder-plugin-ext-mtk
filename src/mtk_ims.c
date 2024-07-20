@@ -200,6 +200,11 @@ mtk_ims_set_registration(
         FEATURE_TYPE_VOICE_OVER_LTE, NETWORK_TYPE_LTE, enabled, ISLAST_NULL,
         NULL, NULL, NULL);
 
+    mtk_radio_ext_set_ims_cfg(self->radio_ext,
+        enabled /* volteEnable */, enabled /* vilteEnable */, enabled /* vowifiEnable */,
+        enabled /* viwifiEnable */, enabled /* smsEnable */, enabled /* eimsEnable */,
+        NULL, NULL, NULL);
+
     MtkImsResultRequest* req = mtk_ims_result_request_new(ext,
         complete, destroy, user_data);
     guint id = mtk_radio_ext_set_enabled(self->radio_ext,
