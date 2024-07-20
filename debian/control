@@ -8,7 +8,8 @@ Build-Depends: debhelper-compat (= 13),
                libgbinder-dev,
                libgbinder-radio-dev,
                ofono-dev,
-               libofonobinderpluginext-dev
+               libofonobinderpluginext-dev,
+               libandroid-properties-dev,
 Standards-Version: 4.6.1
 
 Package: ofono-binder-plugin-ext-mtk
