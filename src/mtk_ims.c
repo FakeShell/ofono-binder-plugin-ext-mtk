@@ -48,6 +48,8 @@
 
 #include <gutil_macros.h>
 
+#include <hybris/properties/properties.h>
+
 typedef GObjectClass MtkImsClass;
 typedef struct mtk_ims {
     GObject parent;
@@ -204,6 +206,14 @@ mtk_ims_set_registration(
         enabled /* volteEnable */, enabled /* vilteEnable */, enabled /* vowifiEnable */,
         enabled /* viwifiEnable */, enabled /* smsEnable */, enabled /* eimsEnable */,
         NULL, NULL, NULL);
+
+    char ifname[32];
+    property_get("wifi.interface", ifname, ""); // seems to exist on mediateks, should be enough?
+    if (strcmp(ifname, "") != 0) {
+        mtk_radio_ext_set_wifi_enabled(self->radio_ext,
+            ifname, enabled ? 1 /* isWifiEnabled */ : 0, 0 /* isFlightModeOn */,
+            NULL, NULL, NULL);
+    }
 
     MtkImsResultRequest* req = mtk_ims_result_request_new(ext,
         complete, destroy, user_data);

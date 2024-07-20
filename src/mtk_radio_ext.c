@@ -874,6 +874,38 @@ mtk_radio_ext_set_ims_cfg(
         viwifi_enable, sms_enable, eims_enable);
 }
 
+static
+void
+mtk_radio_ext_set_wifi_enabled_args(
+    GBinderWriter* args,
+    va_list va)
+{
+    // ifname
+    gbinder_writer_append_hidl_string(args, va_arg(va, char*));
+    // isWifiEnabled
+    gbinder_writer_append_int32(args, va_arg(va, guint32));
+    // isFlightModeOn
+    gbinder_writer_append_int32(args, va_arg(va, guint32));
+}
+
+guint
+mtk_radio_ext_set_wifi_enabled(
+    MtkRadioExt* self,
+    char* ifname,
+    guint32 is_wifi_enabled,
+    guint32 is_flight_mode_on,
+    MtkRadioExtResultFunc complete,
+    GDestroyNotify destroy,
+    void* user_data)
+{
+    return mtk_radio_ext_result_request_submit(self,
+        MTK_RADIO_REQ_SET_WIFI_ENABLED,
+        0, // sendWifiEnabledResponse is in IMtkRadioExResponse which we do not subscribe to (we don't really need to either), give a dummy value for now
+        mtk_radio_ext_set_wifi_enabled_args,
+        complete, destroy, user_data,
+        ifname, is_wifi_enabled, is_flight_mode_on);
+}
+
 gulong
 mtk_radio_ext_add_ims_reg_status_handler(
     MtkRadioExt* self,

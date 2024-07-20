@@ -89,6 +89,16 @@ mtk_radio_ext_set_ims_cfg(
     GDestroyNotify destroy,
     void* user_data);
 
+guint
+mtk_radio_ext_set_wifi_enabled(
+    MtkRadioExt* self,
+    char* ifname,
+    guint32 is_wifi_enabled,
+    guint32 is_flight_mode_on,
+    MtkRadioExtResultFunc complete,
+    GDestroyNotify destroy,
+    void* user_data);
+
 gulong
 mtk_radio_ext_add_ims_reg_status_handler(
     MtkRadioExt* self,
