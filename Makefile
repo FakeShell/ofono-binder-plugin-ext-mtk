@@ -12,7 +12,7 @@ OFONO_PKG ?= ofono
 # on all platforms.
 #
 
-LDPKGS = libofonobinderpluginext libgbinder-radio libgbinder libglibutil gobject-2.0 glib-2.0 libandroid-properties
+LDPKGS = libofonobinderpluginext libgbinder-radio libgbinder libglibutil gobject-2.0 glib-2.0 libandroid-properties gio-2.0
 PKGS = $(OFONO_PKG) $(LDPKGS)
 
 #
@@ -41,7 +41,8 @@ SRC = \
   mtk_ims_call.c \
   mtk_radio_ext.c \
   mtk_plugin.c \
-  mtk_slot.c
+  mtk_slot.c \
+  nm_dbus.c
 
 #
 # Directories

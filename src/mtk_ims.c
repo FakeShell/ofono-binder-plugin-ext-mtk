@@ -41,6 +41,8 @@
 #include "mtk_radio_ext.h"
 #include "mtk_radio_ext_types.h"
 
+#include "nm_dbus.h"
+
 #include <binder_ext_ims_impl.h>
 
 #include <ofono/log.h>
@@ -56,6 +58,8 @@ typedef struct mtk_ims {
     char* slot;
     MtkRadioExt* radio_ext;
     BINDER_EXT_IMS_STATE ims_state;
+    NMInfo nm_info;
+    char ifname[32];
 } MtkIms;
 
 static
@@ -169,6 +173,27 @@ mtk_ims_reg_status_changed(
     }
 }
 
+static
+void
+mtk_ims_nm_callback_wrapper(
+    const char* ipv4_addr,
+    guint32 ipv4_prefix_len,
+    const char* ipv4_gateway,
+    guint32 dns_count,
+    const char* dns_servers,
+    void* user_data)
+{
+    MtkIms* self = THIS(user_data);
+    mtk_radio_ext_set_wifi_ip_address(self->radio_ext,
+        self->ifname,
+        ipv4_addr,
+        ipv4_prefix_len,
+        ipv4_gateway,
+        dns_count,
+        dns_servers,
+        NULL, NULL, NULL);
+}
+
 /*==========================================================================*
  * BinderExtImsInterface
  *==========================================================================*/
@@ -197,6 +222,7 @@ mtk_ims_set_registration(
 
     DBG("%s", self->slot);
     const gboolean enabled = (registration != BINDER_EXT_IMS_REGISTRATION_OFF);
+    DBG("IMS register: %d", enabled);
 
     mtk_radio_ext_set_ims_cfg_feature_value(self->radio_ext,
         FEATURE_TYPE_VOICE_OVER_LTE, NETWORK_TYPE_LTE, enabled, ISLAST_NULL,
@@ -207,12 +233,18 @@ mtk_ims_set_registration(
         enabled /* viwifiEnable */, enabled /* smsEnable */, enabled /* eimsEnable */,
         NULL, NULL, NULL);
 
-    char ifname[32];
-    property_get("wifi.interface", ifname, ""); // seems to exist on mediateks, should be enough?
-    if (strcmp(ifname, "") != 0) {
+    property_get("wifi.interface", self->ifname, ""); // seems to exist on mediateks, should be enough?
+    if (strcmp(self->ifname, "") != 0) {
         mtk_radio_ext_set_wifi_enabled(self->radio_ext,
-            ifname, enabled ? 1 /* isWifiEnabled */ : 0, 0 /* isFlightModeOn */,
+            self->ifname, enabled ? 1 /* isWifiEnabled */ : 0, 0 /* isFlightModeOn */,
             NULL, NULL, NULL);
+
+        DBG("wifi interface is %s", self->ifname);
+        if (nm_initialize(&self->nm_info, self->ifname, mtk_ims_nm_callback_wrapper, self)) {
+            DBG("NM initialization successful for interface %s", self->ifname);
+        } else {
+            DBG("NM initialization failed for interface %s", self->ifname);
+        }
     }
 
     MtkImsResultRequest* req = mtk_ims_result_request_new(ext,
@@ -311,6 +343,7 @@ mtk_ims_finalize(
 
     g_free(self->slot);
     mtk_radio_ext_unref(self->radio_ext);
+    nm_info_free(&self->nm_info);
 
     G_OBJECT_CLASS(PARENT_CLASS)->finalize(object);
 }

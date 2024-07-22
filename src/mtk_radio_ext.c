@@ -906,6 +906,68 @@ mtk_radio_ext_set_wifi_enabled(
         ifname, is_wifi_enabled, is_flight_mode_on);
 }
 
+static
+void
+mtk_radio_ext_set_wifi_ip_address_args(
+    GBinderWriter* args,
+    va_list va)
+{
+    const char* ifName = va_arg(va, const char*);
+    const char* ipv4Addr = va_arg(va, const char*);
+    const char* ipv4PrefixLen = va_arg(va, const char*);
+    const char* ipv4Gateway = va_arg(va, const char*);
+    const char* dnsCount = va_arg(va, const char*);
+    const char* dnsServers = va_arg(va, const char*);
+
+    const char* data[] = {
+        ifName,
+        ipv4Addr,
+        "",  // ipv6Addr (we don't set a listener for ipv6)
+        ipv4PrefixLen,
+        "",  // ipv6PrefixLen (we don't set a listener for ipv6)
+        ipv4Gateway,
+        "",  // ipv6Gateway (we don't set a listener for ipv6)
+        dnsCount,
+        dnsServers
+    };
+
+    gssize count = sizeof(data) / sizeof(data[0]);
+
+    DBG("ifName: %s, ipv4Addr: %s, ipv4PrefixLen: %s, ipv4Gateway: %s, dnsCount: %s, dnsServers: %s",
+        ifName, ipv4Addr, ipv4PrefixLen, ipv4Gateway, dnsCount, dnsServers);
+
+    // data <ipv4Addr, ipv6Addr, ipv4PrefixLen, ipv6PrefixLen, ipv4Gateway, ipv6Gateway, dnsCount, dnsServers>
+    gbinder_writer_append_hidl_string_vec(args, data, count);
+}
+
+guint
+mtk_radio_ext_set_wifi_ip_address(
+    MtkRadioExt* self,
+    const char* iface,
+    const char* ipv4_addr,
+    guint32 ipv4_prefix_len,
+    const char* ipv4_gateway,
+    guint32 dns_count,
+    const char* dns_servers,
+    MtkRadioExtResultFunc complete,
+    GDestroyNotify destroy,
+    void* user_data)
+{
+    char ipv4_prefix_len_str[16];
+    char dns_count_str[16];
+
+    snprintf(ipv4_prefix_len_str, sizeof(ipv4_prefix_len_str), "%u", ipv4_prefix_len);
+    snprintf(dns_count_str, sizeof(dns_count_str), "%u", dns_count);
+
+    return mtk_radio_ext_result_request_submit(self,
+        MTK_RADIO_REQ_SET_WIFI_IP_ADDRESS,
+        0, // sendWifiIpAddressResponse is in IMtkRadioExResponse which we do not subscribe to, give a dummy value for now
+        mtk_radio_ext_set_wifi_ip_address_args,
+        complete, destroy, user_data,
+        iface, ipv4_addr, ipv4_prefix_len_str,
+        ipv4_gateway, dns_count_str, dns_servers);
+}
+
 gulong
 mtk_radio_ext_add_ims_reg_status_handler(
     MtkRadioExt* self,

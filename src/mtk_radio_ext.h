@@ -99,6 +99,19 @@ mtk_radio_ext_set_wifi_enabled(
     GDestroyNotify destroy,
     void* user_data);
 
+guint
+mtk_radio_ext_set_wifi_ip_address(
+    MtkRadioExt* self,
+    const char* iface,
+    const char* ipv4_addr,
+    guint32 ipv4_prefix_len,
+    const char* ipv4_gateway,
+    guint32 dns_count,
+    const char* dns_servers,
+    MtkRadioExtResultFunc complete,
+    GDestroyNotify destroy,
+    void* user_data);
+
 gulong
 mtk_radio_ext_add_ims_reg_status_handler(
     MtkRadioExt* self,
