@@ -112,6 +112,13 @@ mtk_radio_ext_set_wifi_ip_address(
     GDestroyNotify destroy,
     void* user_data);
 
+guint
+mtk_radio_ext_hangup_all(
+    MtkRadioExt* self,
+    MtkRadioExtResultFunc complete,
+    GDestroyNotify destroy,
+    void* user_data);
+
 gulong
 mtk_radio_ext_add_ims_reg_status_handler(
     MtkRadioExt* self,

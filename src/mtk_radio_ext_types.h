@@ -31,6 +31,7 @@
     c(14, 7, setImsEnabled, SET_IMS_ENABLED) \
     c(15, 8, setImsCfg, SET_IMS_CFG) \
     c(16, 9, getProvisionValue, GET_PROVISION_VALUE) \
+    c(48, 1, hangupAll, HANGUP_ALL) \
     c(49, 2, setCallIndication, SET_CALL_INDICATION) \
     c(151, 43, setImsCfgFeatureValue, SET_IMS_CFG_FEATURE_VALUE)
 

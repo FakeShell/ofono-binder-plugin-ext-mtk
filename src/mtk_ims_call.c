@@ -415,7 +415,10 @@ mtk_ims_call_hangup(
     GDestroyNotify destroy,
     void* user_data)
 {
-    DBG("hangup is not implemented yet");
+    MtkImsCall* self = THIS(ext);
+    mtk_radio_ext_hangup_all(self->radio_ext,
+        NULL, NULL, NULL);
+
     return 0;
 }
 

@@ -1335,6 +1335,28 @@ mtk_radio_ext_set_wifi_ip_address(
         ipv4_gateway, dns_count_str, dns_servers);
 }
 
+static
+void
+mtk_radio_ext_hangup_all_args(
+    GBinderWriter* args,
+    va_list va)
+{
+}
+
+guint
+mtk_radio_ext_hangup_all(
+    MtkRadioExt* self,
+    MtkRadioExtResultFunc complete,
+    GDestroyNotify destroy,
+    void* user_data)
+{
+    return mtk_radio_ext_result_request_submit(self,
+        MTK_RADIO_REQ_HANGUP_ALL,
+        IMS_RADIO_RESP_HANGUP_ALL,
+        mtk_radio_ext_hangup_all_args,
+        complete, destroy, user_data);
+}
+
 gulong
 mtk_radio_ext_add_ims_reg_status_handler(
     MtkRadioExt* self,
