@@ -440,6 +440,325 @@ mtk_radio_ext_handle_ims_reg_status_report(
 }
 
 static
+void
+mtk_radio_ext_handle_ims_registration_info(
+    MtkRadioExt* self,
+    const GBinderReader* args)
+{
+    GBinderReader reader;
+    gbinder_reader_copy(&reader, args);
+    int register_state = 0, capability = 0;
+
+    /* imsRegistrationInfo(RadioIndicationType type, int32_t registerState, int32_t capability) */
+    gbinder_reader_copy(&reader, args);
+    gbinder_reader_read_int32(&reader, &register_state);
+    gbinder_reader_read_int32(&reader, &capability);
+
+    DBG("%s: IMS Registration info (imsRegistrationInfo): register state: %d, capability: %d",
+        self->slot, register_state, capability);
+}
+
+static
+void
+mtk_radio_ext_handle_ims_bearer_init(
+    MtkRadioExt* self,
+    const GBinderReader* args)
+{
+    /* imsBearerInit(RadioIndicationType type) */
+    DBG("%s: IMS Bearer successfully initialized (imsBearerInit)", self->slot);
+}
+
+static
+void
+mtk_radio_ext_handle_speech_codec_info_indication(
+    MtkRadioExt* self,
+    const GBinderReader* args)
+{
+    GBinderReader reader;
+    int info = 0;
+
+    /* speechCodecInfoIndication(RadioIndicationType type, int32_t info) */
+    gbinder_reader_copy(&reader, args);
+    gbinder_reader_read_int32(&reader, &info);
+
+    DBG("%s: Speech codec info (speechCodecInfoIndication): %d", self->slot, info);
+}
+
+static
+void
+mtk_radio_ext_handle_ims_cfg_feature_changed(
+    MtkRadioExt* self,
+    const GBinderReader* args)
+{
+    GBinderReader reader;
+    int phone_id = 0, feature_id = 0, value = 0;
+
+    /* imsCfgFeatureChanged(RadioIndicationType type, int32_t phoneId, int32_t featureId, int32_t value) */
+    gbinder_reader_copy(&reader, args);
+    gbinder_reader_read_int32(&reader, &phone_id);
+    gbinder_reader_read_int32(&reader, &feature_id);
+    gbinder_reader_read_int32(&reader, &value);
+
+    DBG("%s: IMS Feature changed (imsCfgFeatureChanged): phone id: %d, feature id: %d, value: %d",
+        self->slot, phone_id, feature_id, value);
+}
+
+static
+void
+mtk_radio_ext_handle_ims_cfg_config_changed(
+    MtkRadioExt* self,
+    const GBinderReader* args)
+{
+    GBinderReader reader;
+    int phone_id = 0;
+
+    /* imsCfgConfigChanged(RadioIndicationType type, int32_t phoneId, string configId, string value) */
+    gbinder_reader_copy(&reader, args);
+    gbinder_reader_read_int32(&reader, &phone_id);
+    const char* config_id = gbinder_reader_read_hidl_string_c(&reader);
+    const char* value = gbinder_reader_read_hidl_string_c(&reader);
+
+    DBG("%s: IMS Config changed (imsCfgConfigChanged): phone id: %d, config id: %s, value: %s",
+        self->slot, phone_id, config_id, value);
+}
+
+static
+void
+mtk_radio_ext_handle_ims_cfg_config_loaded(
+    MtkRadioExt* self,
+    const GBinderReader* args)
+{
+    /* imsCfgConfigLoaded(RadioIndicationType type) */
+    DBG("%s: IMS Config loaded (imsCfgConfigLoaded)", self->slot);
+}
+
+static
+void
+mtk_radio_ext_handle_ims_cfg_dynamic_ims_switch_complete(
+    MtkRadioExt* self,
+    const GBinderReader* args)
+{
+    /* imsCfgDynamicImsSwitchComplete(RadioIndicationType type) */
+    DBG("%s: IMS dynamic configuration switch completed (imsCfgDynamicImsSwitchComplete)", self->slot);
+}
+
+static
+void
+mtk_radio_ext_handle_sip_reg_info_ind(
+    MtkRadioExt* self,
+    const GBinderReader* args)
+{
+    GBinderReader reader;
+    int account_id = 0, response_code = 0;
+    char** data;
+
+    /* sipRegInfoInd(RadioIndicationType type, int32_t account_id, int32_t response_code, vec<string> info) */
+    gbinder_reader_copy(&reader, args);
+    gbinder_reader_read_int32(&reader, &account_id);
+    gbinder_reader_read_int32(&reader, &response_code);
+    data = gbinder_reader_read_hidl_string_vec(&reader);
+
+    if (data && g_strv_length(data) >= 4) {
+        /* 1. direction
+         * 2. SIP_msg_type
+         * 3. method
+         * 4. reason_phrase
+         * 5. warn_text */
+
+        char* direction = data[0];
+        char* msg_type = data[1];
+        char* method = data[2];
+        char* reason_phrase = data[3];
+        char* warn_text = data[4];
+
+        DBG("%s: SIP Registration info indication (sipRegInfoInd):"
+            " account id: %d, response code: %d, direction: %s, msg type: %s, method: %s, reason phrase: %s, warn text: %s",
+            self->slot, account_id, response_code, direction, msg_type, method, reason_phrase, warn_text);
+        g_strfreev(data);
+    } else {
+        DBG("%s: failed to parse sipRegInfoInd data", self->slot);
+    }
+}
+
+static
+void
+mtk_radio_ext_handle_ims_reg_info_ind(
+    MtkRadioExt* self,
+    const GBinderReader* args)
+{
+    GBinderReader reader;
+    gsize count = 0, size = 0;
+    const int32_t *data;
+
+    /* imsRegInfoInd(RadioIndicationType type, vec<int32_t> info) */
+    gbinder_reader_copy(&reader, args);
+    data = gbinder_reader_read_hidl_vec(&reader, &count, &size);
+
+    if (data) {
+        /* 1. reg_state
+         * 2. reg_type
+         * 3. ext_info
+         * 4. dereg_cause
+         * 5. ims_retry
+         * 6. rat
+         * 7. sip_uri_type */
+        int reg_state = 0, reg_type = 0, ext_info = 0, dereg_cause = 0, ims_retry = 0, rat = 0, sip_uri_type = 0;
+
+        reg_state = data[0];
+        reg_type = data[1];
+        ext_info = data[2];
+        dereg_cause = data[3];
+        ims_retry = data[4];
+        rat = data[5];
+        sip_uri_type = data[6];
+
+        DBG("%s: IMS registration info indication (imsRegInfoInd):"
+            " reg state: %d, reg type: %d, ext info: %d, dereg cause: %d, ims retry: %d, rat: %d, sip uri type: %d",
+            self->slot, reg_state, reg_type, ext_info, dereg_cause, ims_retry, rat, sip_uri_type);
+    } else {
+        DBG("%s: failed to parse imsRegInfoInd data", self->slot);
+    }
+}
+
+static
+void
+mtk_radio_ext_handle_rtt_capability_indication(
+    MtkRadioExt* self,
+    const GBinderReader* args)
+{
+    GBinderReader reader;
+    gbinder_reader_copy(&reader, args);
+    int call_id = 0, local_cap = 0, remote_cap = 0, local_status = 0, remote_status = 0;
+
+    /* rttCapabilityIndication(RadioIndicationType type, int32_t callId, int32_t localCap,
+                               int32_t remoteCap, int32_t localStatus, int32_t remoteStatus) */
+    gbinder_reader_copy(&reader, args);
+    gbinder_reader_read_int32(&reader, &call_id);
+    gbinder_reader_read_int32(&reader, &local_cap);
+    gbinder_reader_read_int32(&reader, &remote_cap);
+    gbinder_reader_read_int32(&reader, &local_status);
+    gbinder_reader_read_int32(&reader, &remote_status);
+
+    DBG("%s: RTT Capability (rttCapabilityIndication): call id: %d, local capability: %d,"
+         " remote capability: %d, local status: %d, remote status: %d",
+         self->slot, call_id, local_cap, remote_cap, local_status, remote_status);
+}
+
+static
+void
+mtk_radio_ext_handle_send_vops_indication(
+    MtkRadioExt* self,
+    const GBinderReader* args)
+{
+    GBinderReader reader;
+    gbinder_reader_copy(&reader, args);
+    int vops = 0;
+
+    /* sendVopsIndication(RadioIndicationType type, int32_t vops) */
+    gbinder_reader_copy(&reader, args);
+    gbinder_reader_read_int32(&reader, &vops);
+
+    DBG("%s: VoPS Indication (sendVopsIndication): VoPS: %d", self->slot, vops);
+}
+
+static
+void
+mtk_radio_ext_handle_sip_call_progress_indicator(
+    MtkRadioExt* self,
+    const GBinderReader* args)
+{
+    GBinderReader reader;
+
+    /* sipCallProgressIndicator(RadioIndicationType type, string callId, string dir,
+                                string sipMsgType, string method, string responseCode, string reasonText) */
+    gbinder_reader_copy(&reader, args);
+    const char* call_id = gbinder_reader_read_hidl_string_c(&reader);
+    const char* dir = gbinder_reader_read_hidl_string_c(&reader);
+    const char* sip_msg_type = gbinder_reader_read_hidl_string_c(&reader);
+    const char* method = gbinder_reader_read_hidl_string_c(&reader);
+    const char* response_code = gbinder_reader_read_hidl_string_c(&reader);
+    const char* reason_text = gbinder_reader_read_hidl_string_c(&reader);
+
+    DBG("%s: SIP Call progress indicator (sipCallProgressIndicator): call id: %s, dir: %s,"
+        " SIP message type: %s, method: %s, response code: %s, reason text: %s",
+        self->slot, call_id, dir, sip_msg_type, method, response_code, reason_text);
+}
+
+static
+void
+mtk_radio_ext_handle_video_capability_indicator(
+    MtkRadioExt* self,
+    const GBinderReader* args)
+{
+    GBinderReader reader;
+
+    /* videoCapabilityIndicator(RadioIndicationType type, string callId,
+                                string localVideoCap, string remoteVideoCap) */
+    gbinder_reader_copy(&reader, args);
+    const char* call_id = gbinder_reader_read_hidl_string_c(&reader);
+    const char* local_video_cap = gbinder_reader_read_hidl_string_c(&reader);
+    const char* remote_video_cap = gbinder_reader_read_hidl_string_c(&reader);
+
+    DBG("%s: Video capability indicator (videoCapabilityIndicator): call id: %s,"
+        " local video capibility: %s, remote video capability: %s",
+        self->slot, call_id, local_video_cap, remote_video_cap);
+}
+
+static
+void
+mtk_radio_ext_handle_on_xui(
+    MtkRadioExt* self,
+    const GBinderReader* args)
+{
+    GBinderReader reader;
+
+    /* onXui(RadioIndicationType type, string accountId, string broadcastFlag, string xuiInfo) */
+    gbinder_reader_copy(&reader, args);
+    const char* account_id = gbinder_reader_read_hidl_string_c(&reader);
+    const char* broadcast_flag = gbinder_reader_read_hidl_string_c(&reader);
+    const char* xui_info = gbinder_reader_read_hidl_string_c(&reader);
+
+    DBG("%s: XUI (onXui): account id: %s, broadcast flag: %s, xui info: %s",
+        self->slot, account_id, broadcast_flag, xui_info);
+}
+
+static
+void
+mtk_radio_ext_handle_on_volte_subscription(
+    MtkRadioExt* self,
+    const GBinderReader* args)
+{
+    GBinderReader reader;
+    int status = 0;
+
+    /* onVolteSubscription(RadioIndicationType type, int32_t status) */
+    gbinder_reader_copy(&reader, args);
+    gbinder_reader_read_int32(&reader, &status);
+
+    DBG("%s: VoLTE Subscription (onVolteSubscription): status: %d (%s)", self->slot, status,
+        status == 1 ? "VoLTE card" : (status == 2 ? "non VoLTE card" : "Unknown"));
+}
+
+static
+void
+mtk_radio_ext_handle_call_rat_indication(
+    MtkRadioExt* self,
+    const GBinderReader* args)
+{
+    GBinderReader reader;
+    int domain = 0, rat = 0;
+
+    /* callRatIndication(RadioIndicationType type, int32_t domain, int32_t rat) */
+    gbinder_reader_copy(&reader, args);
+    gbinder_reader_read_int32(&reader, &domain);
+    gbinder_reader_read_int32(&reader, &rat);
+
+    DBG("%s: Call RAT (callRatIndication): domain: %d (%s), rat: %d (%s)", self->slot,
+        domain, domain == 0 ? "CS" : (domain == 1 ? "IMS" : "Unknown"),
+        rat, rat == 1 ? "LTE" : (rat == 2 ? "Wifi" : "Unknown"));
+}
+
+static
 GBinderLocalReply*
 mtk_radio_ext_indication(
     GBinderLocalObject* obj,
@@ -467,8 +786,56 @@ mtk_radio_ext_indication(
             case IMS_RADIO_IND_CALL_INFO_INDICATION:
                 mtk_radio_ext_handle_call_info_indication(self, &args);
                 return NULL;
+            case IMS_RADIO_IND_SIP_CALL_PROGRESS_INDICATOR:
+                mtk_radio_ext_handle_sip_call_progress_indicator(self, &args);
+                return NULL;
+            case IMS_RADIO_IND_VIDEO_CAPABILITY_INDICATOR:
+                mtk_radio_ext_handle_video_capability_indicator(self, &args);
+                return NULL;
+            case IMS_RADIO_IND_ON_XUI:
+                mtk_radio_ext_handle_on_xui(self, &args);
+                return NULL;
+            case IMS_RADIO_IND_ON_VOLTE_SUBSCRIPTION:
+                mtk_radio_ext_handle_on_volte_subscription(self, &args);
+                return NULL;
+            case IMS_RADIO_IND_IMS_REGISTRATION_INFO:
+                mtk_radio_ext_handle_ims_registration_info(self, &args);
+                return NULL;
+            case IMS_RADIO_IND_IMS_BEARER_INIT:
+                mtk_radio_ext_handle_ims_bearer_init(self, &args);
+                return NULL;
+            case IMS_RADIO_IND_SPEECH_CODEC_INFO_INDICATION:
+                mtk_radio_ext_handle_speech_codec_info_indication(self, &args);
+                return NULL;
+            case IMS_RADIO_IND_IMS_CFG_FEATURE_CHANGED:
+                mtk_radio_ext_handle_ims_cfg_feature_changed(self, &args);
+                return NULL;
+            case IMS_RADIO_IND_IMS_CFG_DYNAMIC_IMS_SWITCH_COMPLETE:
+                mtk_radio_ext_handle_ims_cfg_dynamic_ims_switch_complete(self, &args);
+                return NULL;
+            case IMS_RADIO_IND_IMS_CFG_CONFIG_CHANGED:
+                mtk_radio_ext_handle_ims_cfg_config_changed(self, &args);
+                return NULL;
+            case IMS_RADIO_IND_IMS_CFG_CONFIG_LOADED:
+                mtk_radio_ext_handle_ims_cfg_config_loaded(self, &args);
+                return NULL;
+            case IMS_RADIO_IND_RTT_CAPABILITY_INDICATION:
+                mtk_radio_ext_handle_rtt_capability_indication(self, &args);
+                return NULL;
+            case IMS_RADIO_IND_SEND_VOPS_INDICATION:
+                mtk_radio_ext_handle_send_vops_indication(self, &args);
+                return NULL;
+            case IMS_RADIO_IND_CALL_RAT_INDICATION:
+                mtk_radio_ext_handle_call_rat_indication(self, &args);
+                return NULL;
+            case IMS_RADIO_IND_SIP_REG_INFO_IND:
+                mtk_radio_ext_handle_sip_reg_info_ind(self, &args);
+                return NULL;
             case IMS_RADIO_IND_IMS_REG_STATUS_REPORT:
                 mtk_radio_ext_handle_ims_reg_status_report(self, &args);
+                return NULL;
+            case IMS_RADIO_IND_IMS_REG_INFO_IND:
+                mtk_radio_ext_handle_ims_reg_info_ind(self, &args);
                 return NULL;
             }
         } else {

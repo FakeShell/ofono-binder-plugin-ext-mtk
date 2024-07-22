@@ -294,7 +294,7 @@ typedef enum ims_radio_resp {
     e(3, econfResultIndication, ECONF_RESULT_INDICATION) \
     e(4, sipCallProgressIndicator, SIP_CALL_PROGRESS_INDICATOR) \
     e(5, callmodChangeIndicator, CALLMOD_CHANGE_INDICATOR) \
-    e(6, videoCapabilityIndication, VIDEO_CAPABILITY_INDICATOR) \
+    e(6, videoCapabilityIndicator, VIDEO_CAPABILITY_INDICATOR) \
     e(7, onUssi, ON_USSI) \
     e(8, getProvisionDone, GET_PROVISION_DONE) \
     e(9, onXui, ON_XUI) \
