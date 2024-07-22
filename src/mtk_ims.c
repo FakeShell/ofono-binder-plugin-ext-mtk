@@ -296,6 +296,7 @@ void
 mtk_ims_iface_init(
     BinderExtImsInterface* iface)
 {
+    iface->flags |= (BINDER_EXT_IMS_INTERFACE_FLAG_SMS_SUPPORT | BINDER_EXT_IMS_INTERFACE_FLAG_VOICE_SUPPORT);
     iface->version = BINDER_EXT_IMS_INTERFACE_VERSION;
     iface->get_state = mtk_ims_get_state;
     iface->set_registration = mtk_ims_set_registration;
