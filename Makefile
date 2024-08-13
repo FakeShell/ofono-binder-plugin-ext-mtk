@@ -39,6 +39,7 @@ SRC = \
   mtk_ext.c \
   mtk_ims.c \
   mtk_ims_call.c \
+  mtk_ims_sms.c \
   mtk_radio_ext.c \
   mtk_plugin.c \
   mtk_slot.c \
