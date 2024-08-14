@@ -18,8 +18,11 @@
 
 #include "mtk_radio_ext.h"
 #include "mtk_radio_ext_types.h"
+#include "binder_util.h"
 
 #include <ofono/log.h>
+#include <ofono/misc.h>
+
 #include <gbinder.h>
 
 #include <gutil_idlepool.h>
@@ -1118,6 +1121,63 @@ mtk_radio_ext_create(
     return self;
 }
 
+/* Taken and modified from ofono-binder-plugin's binder_sms.c */
+
+static
+void
+mtk_ims_sms_gsm_message(
+    GBinderWriter* writer,
+    RadioGsmSmsMessage* msg,
+    const unsigned char* pdu,
+    int pdu_len,
+    int tpdu_len,
+    const GBinderParent* parent)
+{
+    char* tpdu;
+    int smsc_len = pdu_len - tpdu_len;
+    guint msg_index;
+
+    binder_copy_hidl_string(writer, &msg->smscPdu, NULL);
+
+    /* PDU is sent as an ASCII hex string */
+    msg->pdu.len = tpdu_len * 2;
+    tpdu = gbinder_writer_malloc(writer, msg->pdu.len + 1);
+    ofono_encode_hex(pdu + smsc_len, tpdu_len, tpdu);
+    msg->pdu.data.str = tpdu;
+    DBG("PDU: %s", tpdu);
+
+    /* Write GsmSmsMessage and its strings */
+    msg_index = gbinder_writer_append_buffer_object_with_parent(writer,
+        msg, sizeof(*msg), parent);
+    binder_append_hidl_string_data(writer, msg, smscPdu, msg_index);
+    binder_append_hidl_string_data(writer, msg, pdu, msg_index);
+}
+
+static
+void
+mtk_ims_sms_ims_message(
+    GBinderWriter* writer,
+    const unsigned char* pdu,
+    int pdu_len,
+    int tpdu_len)
+{
+    RadioImsSmsMessage* ims = gbinder_writer_new0(writer, RadioImsSmsMessage);
+    RadioGsmSmsMessage* gsm = gbinder_writer_new0(writer, RadioGsmSmsMessage);
+    GBinderParent p;
+
+    ims->tech = RADIO_TECH_FAMILY_3GPP2;
+    ims->gsmMessage.count = 1;
+    ims->gsmMessage.data.ptr = gsm;
+    ims->gsmMessage.owns_buffer = TRUE;
+
+    p.index = gbinder_writer_append_buffer_object(writer, ims, sizeof(*ims));
+    p.offset = G_STRUCT_OFFSET(RadioImsSmsMessage, cdmaMessage.data.ptr);
+    gbinder_writer_append_buffer_object_with_parent(writer, NULL, 0, &p);
+
+    p.offset = G_STRUCT_OFFSET(RadioImsSmsMessage, gsmMessage.data.ptr);
+    mtk_ims_sms_gsm_message(writer, gsm, pdu, pdu_len, tpdu_len, &p);
+}
+
 /*==========================================================================*
  * API
  *==========================================================================*/
@@ -1394,6 +1454,28 @@ mtk_radio_ext_hangup_all(
         IMS_RADIO_RESP_HANGUP_ALL,
         mtk_radio_ext_hangup_all_args,
         complete, destroy, user_data);
+}
+
+void
+mtk_radio_ext_send_ims_sms_ex(
+    MtkRadioExt* self,
+    const char* smsc,
+    const void* pdu,
+    gsize pdu_len)
+{
+    const guint code = MTK_RADIO_REQ_SEND_IMS_SMS_EX;
+    GBinderClient* client = self->client;
+
+    GBinderLocalRequest* req = gbinder_client_new_request2(client, code);
+    guint serial = mtk_radio_ext_new_req_id();
+
+    GBinderWriter writer;
+    gbinder_local_request_init_writer(req, &writer);
+    gbinder_writer_append_int32(&writer, serial);
+    mtk_ims_sms_ims_message(&writer, pdu, pdu_len, pdu_len - (smsc ? strlen(smsc) : 0));
+
+    mtk_radio_ext_call(self, code, serial, req, NULL, NULL, NULL);
+    gbinder_local_request_unref(req);
 }
 
 gulong

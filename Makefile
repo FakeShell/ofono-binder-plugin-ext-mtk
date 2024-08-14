@@ -43,7 +43,8 @@ SRC = \
   mtk_radio_ext.c \
   mtk_plugin.c \
   mtk_slot.c \
-  nm_dbus.c
+  nm_dbus.c \
+  binder_util.c
 
 #
 # Directories
