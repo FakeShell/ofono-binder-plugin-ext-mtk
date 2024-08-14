@@ -34,8 +34,10 @@ typedef struct mtk_radio_ext {
     char* slot;
     GBinderClient* client;
     GBinderRemoteObject* remote;
-    GBinderLocalObject* response;
-    GBinderLocalObject* indication;
+    GBinderLocalObject* ims_response;
+    GBinderLocalObject* ims_indication;
+    GBinderLocalObject* mtk_response;
+    GBinderLocalObject* mtk_indication;
     GUtilIdlePool* pool;
     GHashTable* requests;
 } MtkRadioExt;
@@ -776,7 +778,7 @@ mtk_radio_ext_indication(
     mtk_radio_ext_log_ind(self, code);
     mtk_radio_ext_dump_data(&args);
 
-    if (g_str_equal(iface, MTK_RADIO_INDICATION)) {
+    if (g_str_equal(iface, MTK_RADIO_IMS_INDICATION)) {
         guint type;
         if (gbinder_reader_read_uint32(&args, &type)) {
             switch(code) {
@@ -839,7 +841,20 @@ mtk_radio_ext_indication(
                 return NULL;
             }
         } else {
-            DBG("Failed to decode indication %s %u", iface, code);
+            DBG("Failed to decode IMS indication %s %u", iface, code);
+            *status = GBINDER_STATUS_FAILED;
+        }
+        // TODO: ack type == RADIO_IND_ACK_EXP indications
+    } else if (g_str_equal(iface, MTK_RADIO_MTK_INDICATION)) {
+        guint type;
+        if (gbinder_reader_read_uint32(&args, &type)) {
+            switch(code) {
+            default:
+                DBG("Unhandled MTK indication code: %u", code);
+                break;
+            }
+        } else {
+            DBG("Failed to decode MTK indication %s %u", iface, code);
             *status = GBINDER_STATUS_FAILED;
         }
         // TODO: ack type == RADIO_IND_ACK_EXP indications
@@ -1051,31 +1066,55 @@ mtk_radio_ext_create(
     const char* slot)
 {
     MtkRadioExt* self = g_object_new(THIS_TYPE, NULL);
-    const gint code = MTK_RADIO_REQ_SET_RESPONSE_FUNCTIONS_IMS;
-    GBinderLocalRequest* req;
-    GBinderWriter writer;
+    const gint ims_code = MTK_RADIO_REQ_SET_RESPONSE_FUNCTIONS_IMS;
+    const gint mtk_code = MTK_RADIO_REQ_SET_RESPONSE_FUNCTIONS_MTK;
+    GBinderLocalRequest *ims_req, *mtk_req;
+    GBinderWriter ims_writer, mtk_writer;
     int status;
 
     self->slot = g_strdup(slot);
     self->client = gbinder_client_new(remote, MTK_RADIO);
-    self->response = gbinder_servicemanager_new_local_object(sm,
-        MTK_RADIO_RESPONSE, mtk_radio_ext_response, self);
-    self->indication = gbinder_servicemanager_new_local_object(sm,
-        MTK_RADIO_INDICATION, mtk_radio_ext_indication, self);
+
+    self->ims_response = gbinder_servicemanager_new_local_object(sm,
+        MTK_RADIO_IMS_RESPONSE, mtk_radio_ext_response, self);
+    self->ims_indication = gbinder_servicemanager_new_local_object(sm,
+        MTK_RADIO_IMS_INDICATION, mtk_radio_ext_indication, self);
 
     /* IMtkRadioEx:setResponseFunctionsIms */
-    req = gbinder_client_new_request2(self->client, code);
-    gbinder_local_request_init_writer(req, &writer);
-    gbinder_writer_append_local_object(&writer, self->response);
-    gbinder_writer_append_local_object(&writer, self->indication);
+    ims_req = gbinder_client_new_request2(self->client, ims_code);
+    gbinder_local_request_init_writer(ims_req, &ims_writer);
+    gbinder_writer_append_local_object(&ims_writer, self->ims_response);
+    gbinder_writer_append_local_object(&ims_writer, self->ims_indication);
 
-    mtk_radio_ext_log_req(self, code, 0 /*serial*/);
-    mtk_radio_ext_dump_request(req);
+    mtk_radio_ext_log_req(self, ims_code, 0 /*serial*/);
+    mtk_radio_ext_dump_request(ims_req);
     gbinder_remote_reply_unref(gbinder_client_transact_sync_reply(self->client,
-        code, req, &status));
+        ims_code, ims_req, &status));
 
     DBG("setResponseFunctionsIms status %d", status);
-    gbinder_local_request_unref(req);
+    gbinder_local_request_unref(ims_req);
+
+    self->client = gbinder_client_new(remote, MTK_RADIO);
+
+    self->mtk_response = gbinder_servicemanager_new_local_object(sm,
+        MTK_RADIO_MTK_RESPONSE, mtk_radio_ext_response, self);
+    self->mtk_indication = gbinder_servicemanager_new_local_object(sm,
+        MTK_RADIO_MTK_INDICATION, mtk_radio_ext_indication, self);
+
+    /* IMtkRadioEx:setResponseFunctionsMtk */
+    mtk_req = gbinder_client_new_request2(self->client, mtk_code);
+    gbinder_local_request_init_writer(mtk_req, &mtk_writer);
+    gbinder_writer_append_local_object(&mtk_writer, self->mtk_response);
+    gbinder_writer_append_local_object(&mtk_writer, self->mtk_indication);
+
+    mtk_radio_ext_log_req(self, mtk_code, 0 /*serial*/);
+    mtk_radio_ext_dump_request(mtk_req);
+    gbinder_remote_reply_unref(gbinder_client_transact_sync_reply(self->client,
+        mtk_code, ims_req, &status));
+
+    DBG("setResponseFunctionsMtk status %d", status);
+    gbinder_local_request_unref(ims_req);
+
     return self;
 }
 

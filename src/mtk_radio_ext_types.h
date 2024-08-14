@@ -19,8 +19,10 @@
 #define MTK_RADIO_IFACE_PREFIX      "vendor.mediatek.hardware.mtkradioex@"
 #define MTK_RADIO_IFACE(x)          MTK_RADIO_IFACE_PREFIX "3.0::" x
 #define MTK_RADIO                   MTK_RADIO_IFACE("IMtkRadioEx")
-#define MTK_RADIO_RESPONSE          MTK_RADIO_IFACE("IImsRadioResponse")
-#define MTK_RADIO_INDICATION        MTK_RADIO_IFACE("IImsRadioIndication")
+#define MTK_RADIO_IMS_RESPONSE          MTK_RADIO_IFACE("IImsRadioResponse")
+#define MTK_RADIO_IMS_INDICATION        MTK_RADIO_IFACE("IImsRadioIndication")
+#define MTK_RADIO_MTK_RESPONSE          MTK_RADIO_IFACE("IMtkRadioExResponse")
+#define MTK_RADIO_MTK_INDICATION        MTK_RADIO_IFACE("IMtkRadioExIndication")
 
 /* c(req, resp, callName, CALL_NAME) */
 #define MTK_RADIO_EXT_IMS_CALL_3_0(c) \
@@ -33,6 +35,8 @@
     c(16, 9, getProvisionValue, GET_PROVISION_VALUE) \
     c(48, 1, hangupAll, HANGUP_ALL) \
     c(49, 2, setCallIndication, SET_CALL_INDICATION) \
+    c(137, 111, setWifiEnabled, SET_WIFI_ENABLED) \
+    c(137, 113, setWifiIpAddress, SET_WIFI_IP_ADDRESS) \
     c(151, 43, setImsCfgFeatureValue, SET_IMS_CFG_FEATURE_VALUE)
 
 typedef enum mtk_radio_req {
@@ -332,7 +336,7 @@ typedef enum ims_radio_resp {
     e(40, rttCapabilityIndication, RTT_CAPABILITY_INDICATION) \
     e(41, rttModifyResponse, RTT_MODIFY_RESPONSE) \
     e(42, rttTextReceive, RTT_TEXT_RECEIVE) \
-    e(43, rttModifyRequestReceive,RTT_MODIFY_REQUEST_RECEIVE) \
+    e(43, rttModifyRequestReceive, RTT_MODIFY_REQUEST_RECEIVE) \
     e(44, audioIndication, AUDIO_INDICATION) \
     e(45, sendVopsIndication, SEND_VOPS_INDICATION) \
     e(46, callAdditionalInfoInd, CALL_ADDITIONAL_INFO_IND) \
