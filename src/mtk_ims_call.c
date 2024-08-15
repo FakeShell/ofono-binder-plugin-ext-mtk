@@ -19,6 +19,7 @@
 #include "mtk_ims_call.h"
 #include "mtk_radio_ext.h"
 #include "mtk_radio_ext_types.h"
+#include "binder_util.h"
 
 #include <binder_ext_call_impl.h>
 
@@ -85,49 +86,6 @@ enum mtk_ims_call_signal {
 #define SIGNAL_CALL_SUPP_SVC_NOTIFY_NAME  "mtk-ims-call-supp-svc-notify"
 
 static guint mtk_ims_call_signals[SIGNAL_COUNT] = { 0 };
-
-/* From ofono-binder-plugin's binder-util.c */
-static
-void
-binder_copy_hidl_string(
-    GBinderWriter* writer,
-    GBinderHidlString* dest,
-    const char* src)
-{
-    gssize len = src ? strlen(src) : 0;
-    dest->owns_buffer = TRUE;
-    if (len > 0) {
-        /* GBinderWriter takes ownership of the string contents */
-        dest->len = (guint32) len;
-        dest->data.str = gbinder_writer_memdup(writer, src, len + 1);
-    } else {
-        /* Replace NULL strings with empty strings */
-        dest->data.str = "";
-        dest->len = 0;
-    }
-}
-
-static
-void
-binder_append_hidl_string_with_parent(
-    GBinderWriter* writer,
-    const GBinderHidlString* str,
-    guint32 index,
-    guint32 offset)
-{
-    GBinderParent parent;
-
-    parent.index = index;
-    parent.offset = offset;
-
-    /* Strings are NULL-terminated, hence len + 1 */
-    gbinder_writer_append_buffer_object_with_parent(writer, str->data.str,
-        str->len + 1, &parent);
-}
-
-#define binder_append_hidl_string_data(writer,ptr,field,index) \
-    binder_append_hidl_string_with_parent(writer, &ptr->field, index, \
-        ((guint8*)(&ptr->field) - (guint8*)ptr))
 
 static
 MtkImsCallResultRequest*
