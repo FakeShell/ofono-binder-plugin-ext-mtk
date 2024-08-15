@@ -35,6 +35,7 @@
     c(16, 9, getProvisionValue, GET_PROVISION_VALUE) \
     c(48, 1, hangupAll, HANGUP_ALL) \
     c(49, 2, setCallIndication, SET_CALL_INDICATION) \
+    c(97, 39, sendImsSmsEx, SEND_IMS_SMS_EX) \
     c(137, 111, setWifiEnabled, SET_WIFI_ENABLED) \
     c(137, 113, setWifiIpAddress, SET_WIFI_IP_ADDRESS) \
     c(151, 43, setImsCfgFeatureValue, SET_IMS_CFG_FEATURE_VALUE)

@@ -902,8 +902,14 @@ mtk_radio_ext_response(
             g_hash_table_remove(self->requests, KEY(serial));
             g_object_unref(self);
         } else {
-            DBG("Unexpected response %s %u", iface, code);
-            *status = GBINDER_STATUS_FAILED;
+            if (req) {
+                /* responses like setImsCfgFeatureValue or setImsCfg don't actually have anything to return (they just return RadioError if available)
+                   this will cause a lot of false positives because we assume a request is always available (else its unexpected)
+                   but this is not the cause, at least not when response doesn't return anything but a possible error message (which goes for a lot of IMS methods!)
+                   so lets only mark the status as failed if a request payload does exist and we really don't have a response for it */
+                DBG("Unexpected response %s %u, expected response code is %d", iface, code, req->response_code);
+                *status = GBINDER_STATUS_FAILED;
+            }
         }
     }
 
