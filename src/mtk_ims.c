@@ -1,6 +1,9 @@
 /*
  * Copyright (C) 2022 Jolla Ltd.
  * Copyright (C) 2022 Slava Monich <slava.monich@jolla.com>
+ * Copyright (C) 2024 TheKit <thekit@disroot.org>
+ * Copyright (C) 2024 Furi Labs
+ * Copyright (C) 2024 Bardia Moshiri <bardia@furilabs.com>
  *
  * You may use this file under the terms of the BSD license as follows:
  *

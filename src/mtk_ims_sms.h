@@ -2,6 +2,7 @@
  *  oFono - Open Source Telephony - binder based adaptation MTK plugin
  *
  *  Copyright (C) 2024 TheKit <thekit@disroot.org>
+ *  Copyright (C) 2024 Furi Labs
  *  Copyright (C) 2024 Bardia Moshiri <bardia@furilabs.com>
  *
  *  This program is free software; you can redistribute it and/or modify
