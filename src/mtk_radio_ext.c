@@ -1105,8 +1105,6 @@ mtk_radio_ext_create(
     DBG("setResponseFunctionsIms status %d", status);
     gbinder_local_request_unref(ims_req);
 
-    self->client = gbinder_client_new(remote, MTK_RADIO);
-
     self->mtk_response = gbinder_servicemanager_new_local_object(sm,
         MTK_RADIO_MTK_RESPONSE, mtk_radio_ext_response, self);
     self->mtk_indication = gbinder_servicemanager_new_local_object(sm,
@@ -1121,10 +1119,10 @@ mtk_radio_ext_create(
     mtk_radio_ext_log_req(self, mtk_code, 0 /*serial*/);
     mtk_radio_ext_dump_request(mtk_req);
     gbinder_remote_reply_unref(gbinder_client_transact_sync_reply(self->client,
-        mtk_code, ims_req, &status));
+        mtk_code, mtk_req, &status));
 
     DBG("setResponseFunctionsMtk status %d", status);
-    gbinder_local_request_unref(ims_req);
+    gbinder_local_request_unref(mtk_req);
 
     return self;
 }
