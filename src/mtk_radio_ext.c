@@ -1324,6 +1324,18 @@ mtk_radio_ext_set_ims_cfg_args(
     gbinder_writer_append_bool(args, va_arg(va, gboolean));
 }
 
+/*
+    Note: currently unused in favor of setImsCfgFeatureValue request,
+    but keept in case it's needed again.
+
+    From analyzing MtkImsService, it is used only during emergency calls
+    and sends the AT+EIMS command to modem directly, temporary overriding
+    the IMS settings.
+
+    In normal mode, MTK RIL would eventually send another AT+EIMS command
+    with the settings stored in properties, effectively overwriting
+    the values set using setImsCfg.
+ */
 guint
 mtk_radio_ext_set_ims_cfg(
     MtkRadioExt* self,

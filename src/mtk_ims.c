@@ -222,22 +222,24 @@ mtk_ims_set_registration(
     void* user_data)
 {
     MtkIms* self = THIS(ext);
-
-    DBG("%s", self->slot);
     const gboolean enabled = (registration != BINDER_EXT_IMS_REGISTRATION_OFF);
-    DBG("IMS register: %d", enabled);
+    gboolean have_wifi_interface;
 
-    mtk_radio_ext_set_ims_cfg_feature_value(self->radio_ext,
-        FEATURE_TYPE_VOICE_OVER_LTE, NETWORK_TYPE_LTE, enabled, ISLAST_NULL,
-        NULL, NULL, NULL);
-
-    mtk_radio_ext_set_ims_cfg(self->radio_ext,
-        enabled /* volteEnable */, enabled /* vilteEnable */, enabled /* vowifiEnable */,
-        enabled /* viwifiEnable */, enabled /* smsEnable */, enabled /* eimsEnable */,
-        NULL, NULL, NULL);
+    DBG("%s, IMS registration: %d", self->slot, enabled);
 
     property_get("wifi.interface", self->ifname, ""); // seems to exist on mediateks, should be enough?
-    if (strcmp(self->ifname, "") != 0) {
+    have_wifi_interface = strcmp(self->ifname, "") != 0;
+
+    mtk_radio_ext_set_ims_cfg_feature_value(self->radio_ext,
+        FEATURE_TYPE_VOICE_OVER_LTE, NETWORK_TYPE_LTE, enabled,
+        have_wifi_interface ? ISLAST_FALSE : ISLAST_TRUE,
+        NULL, NULL, NULL);
+
+    if (have_wifi_interface) {
+        mtk_radio_ext_set_ims_cfg_feature_value(self->radio_ext,
+            FEATURE_TYPE_VOICE_OVER_WIFI, NETWORK_TYPE_IWLAN, enabled, ISLAST_TRUE,
+            NULL, NULL, NULL);
+
         mtk_radio_ext_set_wifi_enabled(self->radio_ext,
             self->ifname, enabled ? 1 /* isWifiEnabled */ : 0, 0 /* isFlightModeOn */,
             NULL, NULL, NULL);
