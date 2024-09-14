@@ -74,6 +74,7 @@ typedef void (*MtkRadioExtArgWriteFunc)(
 
 typedef void (*MtkRadioExtRequestHandlerFunc)(
     MtkRadioExtRequest* req,
+    const RadioResponseInfo* info,
     const GBinderReader* args);
 
 typedef void (*MtkRadioExtResultFunc)(
@@ -884,24 +885,24 @@ mtk_radio_ext_response(
     MtkRadioExt* self = THIS(user_data);
     const char* iface = gbinder_remote_request_interface(req);
     GBinderReader reader;
-    guint32 serial = 0;
+    const RadioResponseInfo* info;
 
     gbinder_remote_request_init_reader(req, &reader);
 
-    gbinder_reader_read_uint32(&reader, &serial);
-    mtk_radio_ext_log_resp(self, code, serial);
+    info = gbinder_reader_read_hidl_struct(&reader, RadioResponseInfo);
+    mtk_radio_ext_log_resp(self, code, info ? info->serial : 0);
     mtk_radio_ext_dump_data(&reader);
 
-    if (serial) {
+    if (info && info->serial) {
         MtkRadioExtRequest* req = g_hash_table_lookup(self->requests,
-            KEY(serial));
+            KEY(info->serial));
 
         if (req && req->response_code == code) {
             g_object_ref(self);
             if (req->handle_response) {
-                req->handle_response(req, &reader);
+                req->handle_response(req, info, &reader);
             }
-            g_hash_table_remove(self->requests, KEY(serial));
+            g_hash_table_remove(self->requests, KEY(info->serial));
             g_object_unref(self);
         } else {
             if (req) {
@@ -913,6 +914,9 @@ mtk_radio_ext_response(
                 *status = GBINDER_STATUS_FAILED;
             }
         }
+    } else {
+        DBG("Failed to parse RadioResponseInfo %s %u", iface, code);
+        *status = GBINDER_STATUS_FAILED;
     }
 
     return NULL;
@@ -922,21 +926,16 @@ static
 void
 mtk_radio_ext_result_response(
     MtkRadioExtRequest* req,
+    const RadioResponseInfo* info,
     const GBinderReader* args)
 {
-    gint32 result;
-    GBinderReader reader;
     MtkRadioExt* self = req->radio;
     MtkRadioExtResultRequest* result_req = G_CAST(req,
         MtkRadioExtResultRequest, base);
 
-    gbinder_reader_copy(&reader, args);
-    if (!gbinder_reader_read_int32(&reader, &result)) {
-        ofono_warn("Failed to parse response");
-        result = -1;
-    }
     if (result_req->complete) {
-        result_req->complete(self, result, req->user_data);
+        // responses without RadioResponseInfo get discarded earlier
+        result_req->complete(self, info->error, req->user_data);
     }
 }
 
