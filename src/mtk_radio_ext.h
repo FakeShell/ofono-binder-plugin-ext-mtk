@@ -33,6 +33,12 @@ typedef void (*MtkRadioExtImsRegStatusFunc)(
     guint status,
     void* user_data);
 
+typedef void (*MtkRadioExtImsRegistrationInfoFunc)(
+    MtkRadioExt* radio,
+    int register_state,
+    int capability,
+    void* user_data);
+
 typedef void (*MtkRadioExtCallInfoFunc)(
     MtkRadioExt* radio,
     guint call_id,
@@ -132,6 +138,12 @@ gulong
 mtk_radio_ext_add_ims_reg_status_handler(
     MtkRadioExt* self,
     MtkRadioExtImsRegStatusFunc handler,
+    void* user_data);
+
+gulong
+mtk_radio_ext_add_ims_registration_info_handler(
+    MtkRadioExt* self,
+    MtkRadioExtImsRegistrationInfoFunc handler,
     void* user_data);
 
 gulong

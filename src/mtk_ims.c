@@ -178,6 +178,26 @@ mtk_ims_reg_status_changed(
 
 static
 void
+mtk_ims_registration_info_changed(
+    MtkRadioExt* radio,
+    int register_state,
+    int capability,
+    void* user_data)
+{
+    MtkIms* self = THIS(user_data);
+    BINDER_EXT_IMS_STATE ims_state;
+
+    ims_state = register_state ? BINDER_EXT_IMS_STATE_REGISTERED :
+        BINDER_EXT_IMS_STATE_NOT_REGISTERED;
+
+    if (ims_state != self->ims_state) {
+        self->ims_state = ims_state;
+        g_signal_emit(self, mtk_ims_signals[SIGNAL_STATE_CHANGED], 0);
+    }
+}
+
+static
+void
 mtk_ims_nm_callback_wrapper(
     const char* ipv4_addr,
     guint32 ipv4_prefix_len,
@@ -331,6 +351,8 @@ mtk_ims_new(
     if (self->radio_ext) {
         mtk_radio_ext_add_ims_reg_status_handler(self->radio_ext,
             mtk_ims_reg_status_changed, self);
+        mtk_radio_ext_add_ims_registration_info_handler(self->radio_ext,
+            mtk_ims_registration_info_changed, self);
     }
 
     return BINDER_EXT_IMS(self);

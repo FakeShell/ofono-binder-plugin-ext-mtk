@@ -57,12 +57,14 @@ G_DEFINE_TYPE(MtkRadioExt, mtk_radio_ext, G_TYPE_OBJECT)
 
 enum mtk_radio_ext_signal {
     SIGNAL_IMS_REG_STATUS_CHANGED,
+    SIGNAL_IMS_REGISTRATION_INFO_CHANGED,
     SIGNAL_CALL_INFO,
     SIGNAL_COUNT
 };
 
-#define SIGNAL_IMS_REG_STATUS_CHANGED_NAME    "mtk-radio-ext-ims-reg-status-changed"
-#define SIGNAL_CALL_INFO_NAME                 "mtk-radio-ext-call-info"
+#define SIGNAL_IMS_REG_STATUS_CHANGED_NAME        "mtk-radio-ext-ims-reg-status-changed"
+#define SIGNAL_IMS_REGISTRATION_INFO_CHANGED_NAME "mtk-radio-ext-ims-registration-info-changed"
+#define SIGNAL_CALL_INFO_NAME                     "mtk-radio-ext-call-info"
 
 static guint mtk_radio_ext_signals[SIGNAL_COUNT] = { 0 };
 
@@ -464,6 +466,9 @@ mtk_radio_ext_handle_ims_registration_info(
 
     DBG("%s: IMS Registration info (imsRegistrationInfo): register state: %d, capability: %d",
         self->slot, register_state, capability);
+
+    g_signal_emit(self, mtk_radio_ext_signals[SIGNAL_IMS_REGISTRATION_INFO_CHANGED],
+                    0, register_state, capability);
 }
 
 static
@@ -1506,6 +1511,16 @@ mtk_radio_ext_add_ims_reg_status_handler(
 }
 
 gulong
+mtk_radio_ext_add_ims_registration_info_handler(
+    MtkRadioExt* self,
+    MtkRadioExtImsRegistrationInfoFunc handler,
+    void* user_data)
+{
+    return (G_LIKELY(self) && G_LIKELY(handler)) ? g_signal_connect(self,
+        SIGNAL_IMS_REGISTRATION_INFO_CHANGED_NAME, G_CALLBACK(handler), user_data) : 0;
+}
+
+gulong
 mtk_radio_ext_add_call_info_handler(
     MtkRadioExt* self,
     MtkRadioExtCallInfoFunc handler,
@@ -1550,6 +1565,10 @@ mtk_radio_ext_class_init(
         g_signal_new(SIGNAL_IMS_REG_STATUS_CHANGED_NAME, G_OBJECT_CLASS_TYPE(klass),
             G_SIGNAL_RUN_FIRST, 0, NULL, NULL, NULL, G_TYPE_NONE,
             1, G_TYPE_UINT);
+    mtk_radio_ext_signals[SIGNAL_IMS_REGISTRATION_INFO_CHANGED] =
+        g_signal_new(SIGNAL_IMS_REGISTRATION_INFO_CHANGED_NAME, G_OBJECT_CLASS_TYPE(klass),
+            G_SIGNAL_RUN_FIRST, 0, NULL, NULL, NULL, G_TYPE_NONE,
+            2, G_TYPE_INT, G_TYPE_INT);
     mtk_radio_ext_signals[SIGNAL_CALL_INFO] =
         g_signal_new(SIGNAL_CALL_INFO_NAME, G_OBJECT_CLASS_TYPE(klass),
             G_SIGNAL_RUN_FIRST, 0, NULL, NULL, NULL, G_TYPE_NONE,
