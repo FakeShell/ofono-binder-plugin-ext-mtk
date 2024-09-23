@@ -127,12 +127,15 @@ mtk_radio_ext_hangup_all(
     GDestroyNotify destroy,
     void* user_data);
 
-void
+guint
 mtk_radio_ext_send_ims_sms_ex(
     MtkRadioExt* self,
     const char* smsc,
     const void* pdu,
-    gsize pdu_len);
+    gsize pdu_len,
+    MtkRadioExtResultFunc complete,
+    GDestroyNotify destroy,
+    void* user_data);
 
 gulong
 mtk_radio_ext_add_ims_reg_status_handler(

@@ -1478,26 +1478,41 @@ mtk_radio_ext_hangup_all(
         complete, destroy, user_data);
 }
 
-void
+guint
 mtk_radio_ext_send_ims_sms_ex(
     MtkRadioExt* self,
     const char* smsc,
     const void* pdu,
-    gsize pdu_len)
+    gsize pdu_len,
+    MtkRadioExtResultFunc complete,
+    GDestroyNotify destroy,
+    void* user_data)
 {
-    const guint code = MTK_RADIO_REQ_SEND_IMS_SMS_EX;
-    GBinderClient* client = self->client;
+    if (G_LIKELY(self)) {
+        const guint code = MTK_RADIO_REQ_SEND_IMS_SMS_EX;
+        const guint resp_code = IMS_RADIO_RESP_SEND_IMS_SMS_EX;
+        GBinderClient* client = self->client;
+        GBinderLocalRequest* args = gbinder_client_new_request2(client, code);
+        GBinderWriter writer;
+        MtkRadioExtResultRequest* req =
+            mtk_radio_ext_result_request_new(self, resp_code,
+                complete, destroy, user_data);
+        const guint req_id = req->base.id;
 
-    GBinderLocalRequest* req = gbinder_client_new_request2(client, code);
-    guint serial = mtk_radio_ext_new_req_id();
+        gbinder_local_request_init_writer(args, &writer);
+        gbinder_writer_append_int32(&writer, req_id);
+        mtk_ims_sms_ims_message(&writer, pdu, pdu_len, pdu_len - (smsc ? strlen(smsc) : 0));
 
-    GBinderWriter writer;
-    gbinder_local_request_init_writer(req, &writer);
-    gbinder_writer_append_int32(&writer, serial);
-    mtk_ims_sms_ims_message(&writer, pdu, pdu_len, pdu_len - (smsc ? strlen(smsc) : 0));
-
-    mtk_radio_ext_call(self, code, serial, req, NULL, NULL, NULL);
-    gbinder_local_request_unref(req);
+        /* Submit the request */
+        mtk_radio_ext_submit_request(&req->base, code, req_id, args);
+        gbinder_local_request_unref(args);
+        if (req->base.tx) {
+            /* Success */
+            return req_id;
+        }
+        g_hash_table_remove(self->requests, KEY(req_id));
+    }
+    return 0;
 }
 
 gulong

@@ -42,6 +42,15 @@ typedef struct mtk_ims_sms {
     GPtrArray* sms;
 } MtkImsSms;
 
+typedef struct mtk_ims_sms_result_request {
+    int ref_count;
+    MtkImsSms* self;
+    BinderExtSms* ext;
+    BinderExtSmsSendFunc complete;
+    GDestroyNotify destroy;
+    void* user_data;
+} MtkImsSmsResultRequest;
+
 static
 void
 mtk_ims_sms_iface_init(
@@ -69,8 +78,84 @@ enum mtk_ims_sms_signal {
 
 static guint mtk_ims_sms_signals[SIGNAL_COUNT] = { 0 };
 
+static
+MtkImsSmsResultRequest*
+mtk_ims_sms_result_request_new(
+    MtkImsSms* self,
+    BinderExtSmsSendFunc complete,
+    GDestroyNotify destroy,
+    void* user_data)
+{
+    MtkImsSmsResultRequest* req =
+        g_slice_new0(MtkImsSmsResultRequest);
+
+    req->ref_count = 1;
+    req->self = self;
+    req->complete = complete;
+    req->destroy = destroy;
+    req->user_data = user_data;
+    return req;
+}
+
+static
+void
+mtk_ims_sms_result_request_free(
+    MtkImsSmsResultRequest* req)
+{
+    BinderExtSms* ext = req->ext;
+
+    if (req->destroy) {
+        req->destroy(req->user_data);
+    }
+    binder_ext_sms_unref(ext);
+    gutil_slice_free(req);
+}
+
+static
+gboolean
+mtk_ims_sms_result_request_unref(
+    MtkImsSmsResultRequest* req)
+{
+    if (!--(req->ref_count)) {
+        mtk_ims_sms_result_request_free(req);
+        return TRUE;
+    } else {
+        return FALSE;
+    }
+}
+
+static
+void
+mtk_ims_sms_result_request_destroy(
+    gpointer req)
+{
+    mtk_ims_sms_result_request_unref(req);
+}
+
+static
+void
+mtk_ims_sms_result_callback(
+    MtkRadioExt* radio,
+    int result,
+    void* user_data)
+{
+    MtkImsSmsResultRequest* req = user_data;
+    BINDER_EXT_SMS_SEND_RESULT send_result;
+
+    if (result == RADIO_ERROR_NONE) {
+        send_result = BINDER_EXT_SMS_SEND_RESULT_OK;
+    } else {
+        send_result = BINDER_EXT_SMS_SEND_RESULT_ERROR;
+    }
+
+    if (req->complete) {
+        req->complete(BINDER_EXT_SMS(req->self), send_result, 0, req->user_data);
+    }
+}
+
+
 /*==========================================================================*
- * BinderExtCallInterface
+ * BinderExtSmsInterface
  *==========================================================================*/
 
 static
@@ -87,9 +172,23 @@ mtk_ims_sms_send(
     void* user_data)
 {
     MtkImsSms* self = THIS(ext);
+    guint ret = 0;
+    MtkImsSmsResultRequest* req;
+
     DBG("Sending SMS over IMS: smsc=%s, pdu_len=%zu, msg_ref=%u", smsc, pdu_len, msg_ref);
-    mtk_radio_ext_send_ims_sms_ex(self->radio_ext, smsc, pdu, pdu_len);
-    return 1; /* not the actual serial, but return something non-null else ofono will assume sending failed and send again */
+
+    req = mtk_ims_sms_result_request_new(self, complete, destroy, user_data);
+
+    ret = mtk_radio_ext_send_ims_sms_ex(self->radio_ext, smsc, pdu, pdu_len,
+                                        mtk_ims_sms_result_callback,
+                                        mtk_ims_sms_result_request_destroy,
+                                        req);
+
+    if (ret == 0) {
+        mtk_ims_sms_result_request_unref(req);
+    }
+
+    return ret;
 }
 
 static
