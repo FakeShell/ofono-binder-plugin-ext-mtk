@@ -199,7 +199,7 @@ mtk_radio_ext_log_req(
     guint32 serial)
 {
     static const GLogModule* log = &mtk_radio_ext_binder_log_module;
-    const int level = GLOG_LEVEL_VERBOSE;
+    const int level = GLOG_LEVEL_INHERIT;
     const char* name;
 
     if (!gutil_log_enabled(log, level))
@@ -223,7 +223,7 @@ mtk_radio_ext_log_resp(
     guint32 serial)
 {
     static const GLogModule* log = &mtk_radio_ext_binder_log_module;
-    const int level = GLOG_LEVEL_VERBOSE;
+    const int level = GLOG_LEVEL_INHERIT;
     const char* name;
 
     if (!gutil_log_enabled(log, level))
@@ -242,7 +242,7 @@ mtk_radio_ext_log_ind(
     guint32 code)
 {
     static const GLogModule* log = &mtk_radio_ext_binder_log_module;
-    const int level = GLOG_LEVEL_VERBOSE;
+    const int level = GLOG_LEVEL_INHERIT;
     const char* name;
 
     if (!gutil_log_enabled(log, level))
@@ -260,7 +260,7 @@ mtk_radio_ext_dump_data(
     const GBinderReader* reader)
 {
     static const GLogModule* log = &mtk_radio_ext_binder_dump_module;
-    const int level = GLOG_LEVEL_VERBOSE;
+    const int level = GLOG_LEVEL_INHERIT;
     gsize size;
     const guint8* data;
 
@@ -277,7 +277,7 @@ mtk_radio_ext_dump_request(
     GBinderLocalRequest* args)
 {
     static const GLogModule* log = &mtk_radio_ext_binder_dump_module;
-    const int level = GLOG_LEVEL_VERBOSE;
+    const int level = GLOG_LEVEL_INHERIT;
     GBinderWriter writer;
     const guint8* data;
     gsize size;
