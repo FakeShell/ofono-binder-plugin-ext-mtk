@@ -44,6 +44,7 @@ SRC = \
   mtk_plugin.c \
   mtk_slot.c \
   nm_dbus.c \
+  dbus_ext.c \
   binder_util.c
 
 #

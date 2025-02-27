@@ -21,6 +21,7 @@
 #include "mtk_radio_ext.h"
 #include "mtk_radio_ext_types.h"
 #include "binder_util.h"
+#include "dbus_ext.h"
 
 #include <ofono/log.h>
 #include <ofono/misc.h>
@@ -43,6 +44,8 @@ typedef struct mtk_radio_ext {
     GBinderLocalObject* ims_indication;
     GBinderLocalObject* mtk_response;
     GBinderLocalObject* mtk_indication;
+    GBinderLocalObject* atci_response;
+    GBinderLocalObject* atci_indication;
     GUtilIdlePool* pool;
     GHashTable* requests;
 } MtkRadioExt;
@@ -928,6 +931,63 @@ mtk_radio_ext_response(
 }
 
 static
+GBinderLocalReply*
+mtk_radio_ext_atci_response(
+    GBinderLocalObject* obj,
+    GBinderRemoteRequest* req,
+    guint code,
+    guint flags,
+    int* status,
+    void* user_data)
+{
+    GBinderReader reader;
+    const AtciResponseInfo* info;
+    const void *vec_data;
+    gsize count, elem_size;
+    MtkRadioExt* self = THIS(user_data);
+
+    gbinder_remote_request_init_reader(req, &reader);
+    info = gbinder_reader_read_hidl_struct(&reader, AtciResponseInfo);
+    if (!info) {
+        DBG("Failed to parse AtciResponseInfo");
+        *status = GBINDER_STATUS_FAILED;
+        return NULL;
+    }
+
+    vec_data = gbinder_reader_read_hidl_vec(&reader, &count, &elem_size);
+    if (!vec_data) {
+        DBG("Failed to read ATCI response data");
+        *status = GBINDER_STATUS_FAILED;
+        return NULL;
+    }
+
+    /* Hand off response processing to the D-Bus extension */
+    if (!dbus_ext_handle_atci_response(self, info->serial, vec_data, count)) {
+        DBG("Failed to handle ATCI response through D-Bus extension");
+        *status = GBINDER_STATUS_FAILED;
+    } else {
+        DBG("ATCI response successfully passed to D-Bus extension");
+        *status = GBINDER_STATUS_OK;
+    }
+
+    return NULL;
+}
+
+static
+GBinderLocalReply*
+mtk_radio_ext_atci_indication(
+    GBinderLocalObject* obj,
+    GBinderRemoteRequest* req,
+    guint code,
+    guint flags,
+    int* status,
+    void* user_data)
+{
+    /* We do not care about ATCI indications (nor do we know even when they are sent) */
+    return NULL;
+}
+
+static
 void
 mtk_radio_ext_result_response(
     MtkRadioExtRequest* req,
@@ -1074,6 +1134,31 @@ mtk_radio_ext_result_request_submit(
 }
 
 static
+void
+mtk_radio_ext_dispatch_at_command(
+    MtkRadioExt* self,
+    guint32 serial,
+    const char* command)
+{
+    const guint code = MTK_RADIO_REQ_SEND_ATCI_REQUEST;
+    GBinderLocalRequest* req;
+    GBinderWriter writer;
+    int status;
+
+    req = gbinder_client_new_request2(self->client, code);
+    gbinder_local_request_init_writer(req, &writer);
+    gbinder_writer_append_int32(&writer, serial);
+    gbinder_writer_append_hidl_vec(&writer, command, strlen(command), 1);
+
+    status = gbinder_client_transact_sync_oneway(self->client, code, req);
+    if (status != GBINDER_STATUS_OK) {
+        DBG("Failed to send AT command %d", status);
+    }
+
+    gbinder_local_request_unref(req);
+}
+
+static
 MtkRadioExt*
 mtk_radio_ext_create(
     GBinderServiceManager* sm,
@@ -1083,8 +1168,9 @@ mtk_radio_ext_create(
     MtkRadioExt* self = g_object_new(THIS_TYPE, NULL);
     const gint ims_code = MTK_RADIO_REQ_SET_RESPONSE_FUNCTIONS_IMS;
     const gint mtk_code = MTK_RADIO_REQ_SET_RESPONSE_FUNCTIONS_MTK;
-    GBinderLocalRequest *ims_req, *mtk_req;
-    GBinderWriter ims_writer, mtk_writer;
+    const gint atci_code = MTK_RADIO_REQ_SET_RESPONSE_FUNCTIONS_FOR_ATCI;
+    GBinderLocalRequest *ims_req, *mtk_req, *atci_req;
+    GBinderWriter ims_writer, mtk_writer, atci_writer;
     int status;
 
     self->slot = g_strdup(slot);
@@ -1094,6 +1180,10 @@ mtk_radio_ext_create(
         MTK_RADIO_IMS_RESPONSE, mtk_radio_ext_response, self);
     self->ims_indication = gbinder_servicemanager_new_local_object(sm,
         MTK_RADIO_IMS_INDICATION, mtk_radio_ext_indication, self);
+    self->atci_response = gbinder_servicemanager_new_local_object(sm,
+        MTK_RADIO_ATCI_RESPONSE, mtk_radio_ext_atci_response, self);
+    self->atci_indication = gbinder_servicemanager_new_local_object(sm,
+        MTK_RADIO_ATCI_INDICATION, mtk_radio_ext_atci_indication, self);
 
     /* IMtkRadioEx:setResponseFunctionsIms */
     ims_req = gbinder_client_new_request2(self->client, ims_code);
@@ -1127,6 +1217,28 @@ mtk_radio_ext_create(
 
     DBG("setResponseFunctionsMtk status %d", status);
     gbinder_local_request_unref(mtk_req);
+
+    /* IMtkRadioEx:setResponseFunctionsForAtci */
+    atci_req = gbinder_client_new_request2(self->client, atci_code);
+    gbinder_local_request_init_writer(atci_req, &atci_writer);
+    gbinder_writer_append_local_object(&atci_writer, self->atci_response);
+    gbinder_writer_append_local_object(&atci_writer, self->atci_indication);
+
+    mtk_radio_ext_log_req(self, atci_code, 0 /*serial*/);
+    mtk_radio_ext_dump_request(atci_req);
+    gbinder_remote_reply_unref(gbinder_client_transact_sync_reply(self->client,
+        atci_code, atci_req, &status));
+
+    DBG("setResponseFunctionsForAtci status %d", status);
+    gbinder_local_request_unref(atci_req);
+
+    /* Initialize D-Bus extension */
+    if (!dbus_ext_init(self, slot)) {
+        DBG("Failed to initialize D-Bus extension for slot %s", slot);
+    }
+
+    /* Register AT command dispatch function */
+    dbus_ext_register_dispatch_func(self, mtk_radio_ext_dispatch_at_command);
 
     return self;
 }
@@ -1555,6 +1667,8 @@ mtk_radio_ext_finalize(
     GObject* object)
 {
     MtkRadioExt* self = THIS(object);
+
+    dbus_ext_cleanup(self);
 
     g_free(self->slot);
     G_OBJECT_CLASS(PARENT_CLASS)->finalize(object);
