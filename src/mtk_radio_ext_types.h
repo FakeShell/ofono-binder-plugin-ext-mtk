@@ -25,6 +25,8 @@
 #define MTK_RADIO_IMS_INDICATION        MTK_RADIO_IFACE("IImsRadioIndication")
 #define MTK_RADIO_MTK_RESPONSE          MTK_RADIO_IFACE("IMtkRadioExResponse")
 #define MTK_RADIO_MTK_INDICATION        MTK_RADIO_IFACE("IMtkRadioExIndication")
+#define MTK_RADIO_ATCI_RESPONSE         MTK_RADIO_IFACE("IAtciResponse")
+#define MTK_RADIO_ATCI_INDICATION       MTK_RADIO_IFACE("IAtciIndication")
 
 /* c(req, resp, callName, CALL_NAME) */
 #define MTK_RADIO_EXT_IMS_CALL_3_0(c) \
@@ -444,6 +446,12 @@ typedef struct ims_reg_status_info {
     GBinderHidlString uri RADIO_ALIGNED(8);
     GBinderHidlString error_msg RADIO_ALIGNED(8);
 } ImsRegStatusInfo;
+
+typedef struct atci_response_info {
+    guint32 type RADIO_ALIGNED(4);
+    guint32 serial RADIO_ALIGNED(4);
+    guint32 error RADIO_ALIGNED(4);
+} AtciResponseInfo;
 
 #endif /* MTK_RADIO_EXT_TYPES_H */
 
