@@ -36,7 +36,7 @@
 #include <gutil_macros.h>
 
 #define MTK_RADIO_CALL_TIMEOUT (3*1000) /* ms */
-#define AT_COMMAND_INTERFACE OFONO_SERVICE ".FuriLabs.MTK.Atci"
+#define AT_COMMAND_INTERFACE OFONO_SERVICE ".FuriLabs.AT"
 
 typedef GObjectClass MtkRadioExtClass;
 typedef struct mtk_radio_ext {
@@ -1198,13 +1198,18 @@ mtk_radio_ext_dispatch_at_command(
     gbinder_local_request_unref(req);
 }
 
-static DBusMessage *mtk_radio_ext_at_command_send(DBusConnection *conn, DBusMessage *msg, void *data)
+static
+DBusMessage*
+mtk_radio_ext_at_command_send(
+    DBusConnection *conn,
+    DBusMessage *msg,
+    void *data)
 {
     DBusMessage *reply;
+    const char *command;
     MtkRadioExt *self = data;
 
     int serial = self->last_atci_serial++;
-    const char *command;
     if (!dbus_message_get_args(msg, NULL, DBUS_TYPE_STRING, &command, DBUS_TYPE_INVALID)) {
         ofono_error("Failed to parse AT command");
         return NULL;
@@ -1297,6 +1302,8 @@ mtk_radio_ext_create(
     GBinderWriter ims_writer, mtk_writer, atci_writer;
     struct ofono_watch *watch;
     int status;
+    int slot_number = slot[strlen(slot) - 1] - '0';
+    const char *ril_path = g_strdup_printf("/ril_%d", slot_number - 1);
 
     self->slot = g_strdup(slot);
     self->client = gbinder_client_new(remote, MTK_RADIO);
@@ -1357,8 +1364,10 @@ mtk_radio_ext_create(
     DBG("setResponseFunctionsForAtci status %d", status);
     gbinder_local_request_unref(atci_req);
 
-    watch = ofono_watch_new("/ril_0");  // TODO: this needs to not be hardcoded
+    watch = ofono_watch_new(ril_path);
     ofono_watch_add_modem_changed_handler(watch, ofono_mtk_radio_ext_modem_watch, self);
+
+    g_free(ril_path);
 
     return self;
 }
